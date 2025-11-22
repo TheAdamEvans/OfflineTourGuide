@@ -103,9 +103,44 @@
 
 ---
 
-## Phase 5: Inference Server & Demo (Sunday Afternoon)
+## Phase 5: Evaluation Strategy for Tour Guide Model Pruning
 
-### 5.1 Serving Infrastructure
+### 5.1 Core Concept
+- [ ] Treat evaluation as a direct measurement of how pruning impacts the model's ability to behave like a tour guide.
+- [ ] Compare progressively pruned checkpoints (layer deletion + width reduction) against a high-quality, human-written corpus of tour descriptions.
+
+### 5.2 Key Metric: Surprisal on Ground Truth
+- [ ] Feed ground truth tour narratives into each model checkpoint instead of sampling generations.
+- [ ] Record token-level surprisal/perplexity and track how the metric drifts as pruning intensifies.
+- [ ] Use surprisal because it reflects whether the model still assigns high probability to canonical tour-guide phrasing and factual statements.
+
+### 5.3 Test Set Design
+- [ ] `seen_cities/` – fresh landmarks from cities already used in training (Sydney, Xian).
+- [ ] `unseen_similar/` – culturally or geographically adjacent cities (Melbourne, Beijing).
+- [ ] `unseen_different/` – cities with very different styles or context (New York, Barcelona).
+- [ ] `edge_cases/` – challenging architectural styles or narratives (Reykjavik, Dubai).
+
+### 5.4 What We're Looking For
+- [ ] Acceptable: small surprisal bumps on common structure/function words while factual tokens remain stable.
+- [ ] Unacceptable: sharp spikes on architectural terminology (e.g., "Romanesque Revival"), proper nouns ("George McRae"), numbers/dates ("1898"), or city-specific cues.
+
+### 5.5 Decision Criteria
+- [ ] Pass if mean perplexity increase < 20% on `seen_cities/`.
+- [ ] Pass if maximum surprisal on factual tokens is < 2× the baseline model.
+- [ ] Fail immediately if any file shows catastrophic loss (perplexity > 1000).
+
+### 5.6 Why This Works
+- [ ] Efficient: avoids subjective human rating loops while still using human-written references.
+- [ ] Targeted: directly measures retention of tour-guide language and factual grounding.
+- [ ] Granular: token-level surprisal highlights whether style vs. knowledge degraded.
+- [ ] Actionable: high surprisal on specific tokens guides which layers/neurons should be restored.
+- [ ] Philosophy: a viable pruned model should not be "surprised" by standard tour-guide narratives; if it is, pruning went too far.
+
+---
+
+## Phase 6: Inference Server & Demo (Sunday Afternoon)
+
+### 6.1 Serving Infrastructure
 - [ ] Deploy chopped model (from Phase 3/4) on RunPod GPU
 - [ ] Build FastAPI endpoint:
   ```
@@ -121,7 +156,7 @@
   → Return generated description
   ```
 
-### 5.2 Web Demo
+### 6.2 Web Demo
 - [ ] Simple web interface:
   - Map view (Leaflet/Mapbox)
   - Click to drop pin
