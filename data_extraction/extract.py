@@ -1,5 +1,5 @@
 """
-Data extraction pipeline for getting location data and Plus Codes from ChatGPT/Claude.
+Data extraction pipeline for getting location data and Plus Codes from Qwen3-14B.
 
 Two approaches:
 1. Generate descriptions FROM Plus Codes (primary workflow)
@@ -10,6 +10,8 @@ import json
 import openlocationcode as olc
 from typing import List, Dict, Optional
 import os
+from pathlib import Path
+import torch
 
 
 # ============================================================================
@@ -20,11 +22,12 @@ def generate_description_from_plus_code(
     plus_code: str,
     interests: List[str],
     style: str,
-    api_client,  # OpenAI or Anthropic client
-    model: str = "gpt-4"
+    model,  # Qwen model instance
+    tokenizer,  # Qwen tokenizer instance
+    device: str = "cuda"
 ) -> Dict:
     """
-    Query ChatGPT/Claude to generate a tour guide description for a Plus Code.
+    Query Qwen3-14B to generate a tour guide description for a Plus Code.
     
     This is the main data generation approach from Phase 1.3.
     
@@ -32,8 +35,9 @@ def generate_description_from_plus_code(
         plus_code: Plus Code string (e.g., "4RRH+Q8 Sydney")
         interests: List of interest tags (e.g., ["architecture", "history"])
         style: Style tag ("brief", "stimulate", "detailed")
-        api_client: OpenAI or Anthropic client instance
-        model: Model name to use
+        model: Qwen model instance
+        tokenizer: Qwen tokenizer instance
+        device: Device to run inference on
     
     Returns:
         Dictionary with plus_code, interests, style, and generated response
@@ -63,27 +67,23 @@ Requirements:
 
 Tour guide description:"""
 
-    # Call API (example for OpenAI - adjust for Anthropic)
-    if hasattr(api_client, 'chat'):  # OpenAI
-        response = api_client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are an expert tour guide for Sydney, Australia."},
-                {"role": "user", "content": prompt}
-            ],
+    # Tokenize and generate
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    
+    # Set max tokens based on style
+    max_new_tokens = 100 if style == "brief" else 300 if style == "stimulate" else 600
+    
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
             temperature=0.7,
-            max_tokens=500 if style == "brief" else 1000 if style == "stimulate" else 2000
+            do_sample=True,
+            pad_token_id=tokenizer.eos_token_id
         )
-        generated_text = response.choices[0].message.content
-    else:  # Anthropic Claude
-        response = api_client.messages.create(
-            model=model,
-            max_tokens=500 if style == "brief" else 1000 if style == "stimulate" else 2000,
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
-        generated_text = response.content[0].text
+    
+    # Decode the generated text
+    generated_text = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
     
     return {
         "plus_code": plus_code,
@@ -97,20 +97,22 @@ Tour guide description:"""
 # APPROACH 2: Extract location data TO create Plus Codes (Alternative)
 # ============================================================================
 
-def extract_poi_list_from_chatgpt(
+def extract_poi_list_from_qwen(
     area: str,
-    api_client,
-    model: str = "gpt-4"
+    model,
+    tokenizer,
+    device: str = "cuda"
 ) -> List[Dict]:
     """
-    Query ChatGPT/Claude to get a list of POIs in an area, then convert to Plus Codes.
+    Query Qwen3-14B to get a list of POIs in an area, then convert to Plus Codes.
     
     This is useful for discovering locations before generating descriptions.
     
     Args:
         area: Area name (e.g., "Sydney CBD", "Bondi Beach")
-        api_client: OpenAI or Anthropic client
-        model: Model name
+        model: Qwen model instance
+        tokenizer: Qwen tokenizer instance
+        device: Device to run inference on
     
     Returns:
         List of dictionaries with name, lat, lon, plus_code, description
@@ -126,25 +128,20 @@ For each POI, provide:
 
 Format as JSON array with keys: name, latitude, longitude, description, category"""
 
-    # Call API
-    if hasattr(api_client, 'chat'):  # OpenAI
-        response = api_client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a location data expert. Return valid JSON only."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"} if "gpt-4" in model else None,
-            temperature=0.3
+    # Tokenize and generate
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=2000,
+            temperature=0.3,
+            do_sample=True,
+            pad_token_id=tokenizer.eos_token_id
         )
-        result = response.choices[0].message.content
-    else:  # Anthropic
-        response = api_client.messages.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=2000
-        )
-        result = response.content[0].text
+    
+    # Decode the generated text
+    result = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
     
     # Parse JSON (may need cleaning)
     try:
@@ -187,12 +184,14 @@ def generate_training_dataset(
     plus_codes: List[str],
     interests_list: List[List[str]],
     styles: List[str],
-    api_client,
+    model,
+    tokenizer,
     output_file: str = "training_data.jsonl",
-    model: str = "gpt-4"
+    text_output_dir: Optional[str] = None,
+    device: str = "cuda"
 ) -> None:
     """
-    Generate training dataset by querying ChatGPT/Claude for each Plus Code combination.
+    Generate training dataset by querying Qwen3-14B for each Plus Code combination.
     
     This implements Phase 1.3 of the plan.
     
@@ -200,13 +199,19 @@ def generate_training_dataset(
         plus_codes: List of Plus Code strings
         interests_list: List of interest tag combinations (e.g., [["architecture"], ["history", "culture"]])
         styles: List of style tags
-        api_client: API client instance
+        model: Qwen model instance
+        tokenizer: Qwen tokenizer instance
         output_file: Output JSONL file path
-        model: Model to use
+        text_output_dir: Optional directory to save individual text files
+        device: Device to run inference on
     """
     
+    # Create text output directory if specified
+    if text_output_dir:
+        Path(text_output_dir).mkdir(parents=True, exist_ok=True)
+    
     with open(output_file, 'w') as f:
-        for plus_code in plus_codes:
+        for idx, plus_code in enumerate(plus_codes):
             for interests in interests_list:
                 for style in styles:
                     print(f"Generating: {plus_code} | {interests} | {style}")
@@ -216,51 +221,66 @@ def generate_training_dataset(
                             plus_code=plus_code,
                             interests=interests,
                             style=style,
-                            api_client=api_client,
-                            model=model
+                            model=model,
+                            tokenizer=tokenizer,
+                            device=device
                         )
+                        
+                        # Write to JSONL
                         f.write(json.dumps(result) + '\n')
                         f.flush()  # Save incrementally
+                        
+                        # Write to text file if directory specified
+                        if text_output_dir:
+                            # Create a safe filename from the plus code and parameters
+                            safe_plus_code = plus_code.replace('+', '_').replace('/', '_')
+                            interests_str = '_'.join(interests)
+                            filename = f"{idx:04d}_{safe_plus_code}_{interests_str}_{style}.txt"
+                            text_file_path = Path(text_output_dir) / filename
+                            
+                            with open(text_file_path, 'w', encoding='utf-8') as txt_file:
+                                txt_file.write(f"Plus Code: {result['plus_code']}\n")
+                                txt_file.write(f"Interests: {', '.join(result['interests'])}\n")
+                                txt_file.write(f"Style: {result['style']}\n")
+                                txt_file.write(f"\n{result['response']}\n")
+                        
                     except Exception as e:
                         print(f"Error generating {plus_code}: {e}")
                         continue
 
 
 # ============================================================================
-# Example Usage
+# Model Loading Utilities
 # ============================================================================
 
-if __name__ == "__main__":
-    # Example: Generate Plus Codes for Sydney locations
-    sydney_locations = [
-        (-33.8688, 151.2093, "Sydney Opera House"),
-        (-33.8615, 151.2120, "Sydney Harbour Bridge"),
-        (-33.8705, 151.2071, "Circular Quay"),
-    ]
+def load_qwen_model(model_name: str = "Qwen/Qwen3-14B", device: str = "cuda"):
+    """
+    Load Qwen3-14B model and tokenizer.
     
-    print("Generating Plus Codes for Sydney locations:")
-    for lat, lon, name in sydney_locations:
-        plus_code = olc.encode(lat, lon, codeLength=10)
-        print(f"{name}: {plus_code}")
+    Args:
+        model_name: HuggingFace model identifier
+        device: Device to load model on
     
-    print("\n" + "="*60)
-    print("To use with ChatGPT/Claude API:")
-    print("="*60)
-    print("""
-    # For OpenAI:
-    from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    Returns:
+        Tuple of (model, tokenizer)
+    """
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    import torch
     
-    # For Anthropic:
-    from anthropic import Anthropic
-    client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    
-    # Generate description:
-    result = generate_description_from_plus_code(
-        plus_code="4RRH+Q8 Sydney",
-        interests=["architecture", "history"],
-        style="detailed",
-        api_client=client
+    print(f"Loading model {model_name}...")
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+        device_map="auto" if device == "cuda" else None,
+        trust_remote_code=True
     )
-    """)
+    
+    if device == "cpu":
+        model = model.to(device)
+    
+    model.eval()
+    print("Model loaded successfully!")
+    
+    return model, tokenizer
 
