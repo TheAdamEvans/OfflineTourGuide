@@ -7,12 +7,12 @@ Two approaches:
 """
 
 import json
-import openlocationcode as olc
-from typing import List, Dict, Optional
 import os
 from pathlib import Path
-import torch
+from typing import Dict, List, Optional
 
+import openlocationcode as olc
+import torch
 
 # ============================================================================
 # APPROACH 1: Generate descriptions FROM Plus Codes (Primary Workflow)
@@ -264,8 +264,8 @@ def load_qwen_model(model_name: str = "Qwen/Qwen3-14B", device: str = "cuda"):
     Returns:
         Tuple of (model, tokenizer)
     """
-    from transformers import AutoModelForCausalLM, AutoTokenizer
     import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
     
     print(f"Loading model {model_name}...")
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
