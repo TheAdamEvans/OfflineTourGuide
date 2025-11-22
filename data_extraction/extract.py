@@ -67,9 +67,10 @@ As a professional tour guide you:
 - Understand needs of families and large groups
 - Offer natural next steps when your tour stop complete
 
-This particular tour group is interested in: {interests_str}. however, don't feel the need to include them in the output unless they're actually relevant. They are from {country} and you are giving the tour in {language}.
+This particular tour group is from {country} and you are giving the tour in {language}.
 
-Generate a {style} tour guide description for the location for: {plus_code} ({location_context}).
+Generate a tour stop blurb for the location for:
+{plus_code} ({location_context})
 """
 
     # Set max tokens based on style
