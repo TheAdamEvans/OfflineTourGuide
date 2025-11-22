@@ -26,107 +26,114 @@ print(f"The Plus Code is: {plus_code}")
 
 ---
 
-# Offline Tour Guide - Distillation Hackathon Plan
+# Offline Tour Guide - Model Compression Hackathon Plan
 
-**Goal:** Distill Qwen 3-32B FP8 → 3B for Sydney POI descriptions using Plus Codes, controllable via style tags
+**Goal:** Compress Qwen 3-32B FP8 → 3B using **activation-guided pruning** for Sydney POI descriptions using Plus Codes, controllable via style tags
 
-**Timeline:** Rest of Friday + Saturday → Demo Sunday 2pm
+**Approach:** Task-aware layer deletion + width pruning (vs. traditional distillation)
 
-## Phase 1: Data Generation Pipeline (Friday Evening)
+**Timeline:** Saturday afternoon/evening → Demo Sunday 2pm
 
-### 1.1 Plus Code Sampling Strategy
-- [ ] Generate hierarchical Plus Code samples for Sydney
-  - City-level codes (8-char): Neighborhoods/suburbs
-  - Block-level codes (10-char): Specific streets
-  - Building-level codes (11+ char): Individual POIs
-- [ ] Implement density-based sampling (weighted by population/POI density)
-- [ ] **TODO:** Define sampling ratios and geographic boundaries
+## Phase 1: Data Generation Pipeline
 
-### 1.2 Interest & Style Tag Combinations
-- [ ] Interest tags: `architecture`, `culture`, `plans`, `nature`, `food`, `history`, etc.
-- [ ] Style tags: `brief`, `stimulate`, `detailed`
-- [ ] Generate all valid combinations (single + multi-interest)
-- [ ] Create prompt templates for each combination
-
-### 1.3 Strong Model Generation (Claude/GPT)
+### Strong Model Generation (Claude/GPT)
 - [ ] Build generation pipeline:
   ```
   Input: (plus_code, interest_tags, style_tag)
   → Claude/GPT prompt
   → Generated POI description
-  → Validate output format (stop token behavior)
   ```
-- [ ] Generate initial dataset (~1-2k examples for rapid iteration)
-- [ ] **TODO:** Decide on prompt engineering strategy for accuracy
-- [ ] Save as JSONL: `{plus_code, interests, style, response}`
+- [ ] Generate initial dataset (2 examples for rapid iteration)
+- [ ] **TODO:** Decide on sampling strategy for accuracy
+- [ ] Save as "{plus_code}.txt"
 
-#### How to Extract Data from ChatGPT/Claude
-
-**Primary Workflow (Approach 1): Generate FROM Plus Codes**
-1. Start with Plus Codes (generated from GPS coordinates via `olc.encode()`)
-2. For each Plus Code + interest/style combination, query ChatGPT/Claude API:
-   ```
-   Prompt: "Generate a {style} tour guide for Plus Code {plus_code}, 
-            focusing on {interests}"
-   ```
-3. Save the generated description as training data
-4. See `data_extraction.py` for implementation
-
-**Alternative Workflow (Approach 2): Extract TO Create Plus Codes**
-1. Query ChatGPT/Claude to get POI lists for an area (e.g., "Sydney CBD")
-2. Extract lat/lon coordinates from the response
-3. Convert coordinates to Plus Codes using `olc.encode()`
-4. Then use Approach 1 to generate descriptions for those Plus Codes
-
-**Key Point:** Plus Codes are the bridge between:
-- Raw location data (GPS, POI lists) → Plus Codes (via `olc.encode()`)
-- Plus Codes → Model training data (via ChatGPT/Claude API queries)
-- Plus Codes → Model inference (model learned to generate from Plus Code inputs)
-
-## Phase 2: Teacher Model Setup (Saturday Morning)
+## Phase 2: Activation Harvesting (Saturday Afternoon) - **Priority 1**
 
 ### 2.1 Qwen 3-32B FP8 Infrastructure
-- [ ] Set up Qwen 3-32B FP8 on GPU server (RunPod)
-- [ ] Implement forward pass logging:
-  - Align tokens and/or layer activations (learned rotation matrix)
-  - Hidden states
-  - Output logits/probabilities
+- [ ] Qwen 3-32B FP8 already deployed on RunPod with vLLM
+- [ ] Implement forward hooks to log ALL layer outputs:
+  - **Architecture:** 64 layers, 5120 hidden dim
+  - Log hidden states at each layer output (post-attention, post-FFN)
+  - **Storage per 256 tokens:** ~82 MB (64 layers × 256 tokens × 5120 × 1 byte FP8)
 - [ ] Test throughput with a small number of "tour stop" generations
 
-### 2.2 Activation Harvesting
-- [ ] Run generated dataset through 32B teacher
-- [ ] Save activations + output probs alongside training data
-- [ ] Format: `{input, teacher_hidden_states, teacher_logits, target_text}`
+### 2.2 Task-Specific Activation Database
+- [ ] Run generated Plus Code dataset through 32B teacher
+- [ ] Save layer outputs in efficient format (PyTorch tensors/HDF5)
+- [ ] Format: `{input_tokens, layer_outputs[64], output_tokens}`
+- [ ] Build analysis toolkit:
+  - Compute layer-wise cosine similarity matrices
+  - Calculate per-layer activation variance/magnitude
+  - Identify redundant/similar layers for pruning
 
-## Phase 3: Student Distillation (Saturday Afternoon/Evening)
+**Goal:** Understand which of the 64 layers are critical for the tour guide task
 
-### 3.1 Qwen 3-3B Training Setup
-- [ ] Initialize Qwen 3-3B student model
-- [ ] Create layer mapping between teacher and student model
-  - Early layers: Match more precisely (basic syntax)
-  - Middle layers: Can skip more teacher layers here
-  - Final layers: Match closely again (task-specific output formatting)
-- [ ] Implement distillation loss:
-  - KL divergence on output logits (temperature tuning?)
-  - MSE on hidden states (layer-wise matching via symmetry)
-  - **Weighting:** Balance these loss components?
-  - Make sure distillation loss properly masks padding and stops at EOS tokens
-- [ ] NO cross-entropy on ground truth
-  - No need for student to also learn from targets
+## Phase 3: Task-Aware Layer Deletion (Saturday Evening) - **Priority 1 / Main Contribution**
 
-### 3.2 Training Loop
-- [ ] Start training with small batch to verify
-- [ ] Monitor:
-  - Loss convergence
-  - **Stop token generation** (critical!)
-  - Output quality on held-out examples
-  - Log activation matching (cosine similarity between projected teacher and student hiddens)
-- [ ] Iterate on hyperparameters if time permits
+### 3.1 Layer Redundancy Analysis
+- [ ] Using activation database from Phase 2:
+  - Compute cosine similarity between consecutive layers (64 layers total)
+  - Identify "redundant" layers (high similarity to neighbors on tour guide task)
+  - Calculate per-layer importance scores:
+    - Activation variance across examples
+    - Distance to adjacent layers
+    - Impact on final output (ablation study if time permits)
 
-## Phase 4: Inference Server & Demo (Sunday Morning)
+### 3.2 Strategic Layer Pruning
+- [ ] Delete layers to go from 64 → ~28 layers (to match 3B architecture roughly)
+- [ ] **Novel approach:** Use task-specific activation patterns to decide which layers to cut
+  - Keep early layers (basic language understanding)
+  - Prune middle layers with high similarity (redundant processing)
+  - Keep final layers (output formatting, tour guide specifics)
+- [ ] Implementation:
+  - Load Qwen 3-32B checkpoint
+  - Delete selected layers from model state dict
+  - Re-index remaining layers
+  - Save "chopped" model checkpoint
 
-### 4.1 Serving Infrastructure
-- [ ] Deploy distilled 3B model on RunPod GPU
+### 3.3 Validation & Analysis
+- [ ] Test chopped model on held-out examples
+- [ ] Check if it still generates coherent output (even if degraded)
+- [ ] **This is the main contribution:** Demonstrate that task-aware layer deletion preserves performance better than blind pruning
+- [ ] Log examples: compare 32B → chopped model outputs
+- [ ] Document which layers were kept/deleted and why
+
+**Goal:** Show that activation-guided pruning beats random layer deletion
+
+## Phase 4: Width Pruning Exploration (Saturday Late/Sunday Morning) - **Priority 2 / If Time Allows**
+
+### 4.1 Neuron-Level Importance Scoring
+- [ ] Using activation database from Phase 2:
+  - Rank attention heads by average activation magnitude (64 heads per layer)
+  - Rank FFN neurons by variance across examples (25,600 dims per layer)
+  - Identify low-importance neurons/heads for pruning
+
+### 4.2 Structured Width Reduction
+- [ ] **Goal:** Aggressive width pruning (~60% reduction) guided by activations
+- [ ] Prune attention heads:
+  - Keep top ~40% of heads per layer based on importance scores
+  - Adjust attention computation for smaller head count
+- [ ] Prune FFN dimensions:
+  - Keep top ~40% of intermediate FFN neurons
+  - Reduce hidden dimension size accordingly (5120 → ~2048)
+- [ ] Implementation challenges:
+  - Weight matrix surgery (removing rows/columns)
+  - Maintaining architectural consistency
+  - Potential need for calibration/fine-tuning
+
+### 4.3 Risk Management
+- [ ] **High risk:** This may break the model entirely at 60%+ reduction
+- [ ] Fallback plan: If width pruning fails, demo Phase 3 results (layer deletion only)
+- [ ] If time permits: Light distillation/fine-tuning on chopped model to recover performance
+
+**Goal:** Explore how far we can push width reduction using activation-guided pruning
+
+---
+
+## Phase 5: Inference Server & Demo (Sunday Afternoon)
+
+### 5.1 Serving Infrastructure
+- [ ] Deploy chopped model (from Phase 3/4) on RunPod GPU
 - [ ] Build FastAPI endpoint:
   ```
   POST /tour-guide
@@ -137,11 +144,11 @@ print(f"The Plus Code is: {plus_code}")
     "style": "detailed"
   }
   → Convert to Plus Code
-  → Format input for 3B model
+  → Format input for chopped model
   → Return generated description
   ```
 
-### 4.2 Web Demo
+### 5.2 Web Demo
 - [ ] Simple web interface:
   - Map view (Leaflet/Mapbox)
   - Click to drop pin
@@ -161,22 +168,30 @@ print(f"The Plus Code is: {plus_code}")
 - **Interest distribution:** Equal sampling or weight toward common interests?
 - **Validation strategy:** How do we verify Claude/GPT outputs are accurate?
 
-### Model Specifics
-- **Which layers to distill?** All 32B layers → 3B layers, or subset?
-- **Loss weighting:** What ratio of KL / MSE / CE losses?
-- **Quantization:** Do we quantize the 3B model for faster inference?
+### Model Compression Specifics
+- **Layer similarity metric:** Cosine similarity? CKA? Other?
+- **How many layers to keep:** 28? 30? 32? (depends on similarity analysis)
+- **Width pruning feasibility:** Can we go 60%+ reduction without fine-tuning?
+- **Quantization:** Do we quantize the chopped model for faster inference?
 
 ### Immediate TODOs
-- Extract data about locations in Sydney using RunPod API with qwen3-32b FP8
-- Runpod - figure out GPU requirements (RAM)
-- Model: Qwen 3-32B FP8 deployed on RunPod
+- Extract data about locations in Sydney using RunPod API with Qwen3-32B FP8
+- Implement forward hooks in vLLM to capture layer activations (~82 MB per 256 tokens)
+- Confirm activation logging doesn't slow down generation too much
 
 ---
 
 ## Success Criteria (Sunday 2pm)
 
-1. ✅ Working inference server accepts GPS → returns contextualized POI description
-2. ✅ Model respects style tags (generates appropriate length)
-3. ✅ Multi-interest queries work
-4. ✅ Demo shows 5-10 diverse Sydney locations
-5. ✅ Latency < 2 seconds per query
+### Must Have (Priority 1)
+1. ✅ Activation database from 32B model on tour guide task
+2. ✅ Task-aware layer deletion implementation (64 → ~28 layers)
+3. ✅ Evidence that activation-guided pruning > random pruning
+4. ✅ Working inference with chopped model (even if degraded)
+5. ✅ Demo shows model still generates coherent tour descriptions
+
+### Nice to Have (Priority 2)
+6. ✅ Width pruning exploration (attention heads + FFN neurons)
+7. ✅ Web interface with map + style/interest controls
+8. ✅ Latency < 2 seconds per query
+9. ✅ Demo on unseen cities (e.g., New York)
