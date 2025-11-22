@@ -28,7 +28,7 @@ print(f"The Plus Code is: {plus_code}")
 
 # Offline Tour Guide - Distillation Hackathon Plan
 
-**Goal:** Distill Qwen 3-14B → 3B for Sydney POI descriptions using Plus Codes, controllable via style tags
+**Goal:** Distill Qwen 3-32B FP8 → 3B for Sydney POI descriptions using Plus Codes, controllable via style tags
 
 **Timeline:** Rest of Friday + Saturday → Demo Sunday 2pm
 
@@ -85,8 +85,8 @@ print(f"The Plus Code is: {plus_code}")
 
 ## Phase 2: Teacher Model Setup (Saturday Morning)
 
-### 2.1 Qwen 3-14B Infrastructure
-- [ ] Set up Qwen 3-14B on GPU server (RunPod)
+### 2.1 Qwen 3-32B FP8 Infrastructure
+- [ ] Set up Qwen 3-32B FP8 on GPU server (RunPod)
 - [ ] Implement forward pass logging:
   - Align tokens and/or layer activations (learned rotation matrix)
   - Hidden states
@@ -94,7 +94,7 @@ print(f"The Plus Code is: {plus_code}")
 - [ ] Test throughput with a small number of "tour stop" generations
 
 ### 2.2 Activation Harvesting
-- [ ] Run generated dataset through 14B teacher
+- [ ] Run generated dataset through 32B teacher
 - [ ] Save activations + output probs alongside training data
 - [ ] Format: `{input, teacher_hidden_states, teacher_logits, target_text}`
 
@@ -154,14 +154,14 @@ print(f"The Plus Code is: {plus_code}")
 - **Validation strategy:** How do we verify Claude/GPT outputs are accurate?
 
 ### Model Specifics
-- **Which layers to distill?** All 14B layers → 3B layers, or subset?
+- **Which layers to distill?** All 32B layers → 3B layers, or subset?
 - **Loss weighting:** What ratio of KL / MSE / CE losses?
 - **Quantization:** Do we quantize the 3B model for faster inference?
 
 ### Immediate TODOs
-- Extract data about locations in Sydney from Cursor AI or Claude code
+- Extract data about locations in Sydney using RunPod API with qwen3-32b FP8
 - Runpod - figure out GPU requirements (RAM)
-- Figure out which Qwen model to use
+- Model: Qwen 3-32B FP8 deployed on RunPod
 
 ---
 
