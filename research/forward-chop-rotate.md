@@ -48,6 +48,14 @@ This is **data‑efficient** because orthogonal maps use covariance structure; w
 ### 4.1 Whiten + shrink
 Z‑score `H32[l]` and `H3[l]` along tokens; add small ridge to covariances (λ≈1e‑3).
 
+> **Implementation note:** the current scaffolding keeps `whiten=True` by default,
+> but the smoke tests exercise the non‑whitened branch until we add a full
+> covariance‑aware lifting step (so the solved rotation exactly matches the
+> ground truth after folding). When running the CLI on real shards, leave
+> whitening enabled for robustness, just be aware that numerical parity with an
+> unwhitened synthetic toy example will show a small residual until that upgrade
+> lands.
+
 ### 4.2 Handle dimension mismatch with a shared subspace
 Let `k = min(d3, d32)` (or ~0.8× for extra stability). Compute PCA:
 - `H3k = H3[l]  @ P3     (T×k)`

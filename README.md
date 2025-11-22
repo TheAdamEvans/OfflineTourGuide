@@ -18,8 +18,15 @@ The script will:
 1. Load the requested HuggingFace model.
 2. Register forward hooks on every transformer block.
 3. Run each sample text through the model.
-4. Save a ``sample_XXXX.pt`` file containing the text, token ids, logits, and
-   raw activations per layer.
+4. Save each sample as a shard (``activations/sample_XXXX.pt`` + a row in
+   ``activations/metadata.jsonl``) that includes the text, token ids, logits,
+   and raw activations per layer alongside token-span + checksum metadata so
+   downstream rotation/permutation tooling can stream the data.
+
+> Every shard recorded through ``ActivationShardWriter`` gets an entry in
+> ``metadata.jsonl`` describing the token range, covered layers, tensor dtype,
+> and SHA256 checksum. This JSONL file is what the rotation CLI parses later
+> to solve PCA/Procrustes transports layer by layer.
 
 ## Custom inputs
 
@@ -49,7 +56,7 @@ pipeline.
 uv run python -m data_extraction.dump_activations --analyze
 ```
 
-You can also analyze an existing dump directly:
+You can also analyze an existing shard directly:
 
 ```python
 from model.activation_analyzer import summarize_activation_file, format_summary_table
@@ -57,6 +64,26 @@ from model.activation_analyzer import summarize_activation_file, format_summary_
 stats = summarize_activation_file("activations/sample_0001.pt")
 print(format_summary_table(stats))
 ```
+
+## Rotation diagnostics
+
+Once you have both student and teacher activation shards recorded (with their
+`metadata.jsonl` files), run the rotation sanity check to estimate PCA +
+Procrustes transports per layer and append cosine diagnostics to a ledger:
+
+```
+uv run python -m transport.rotation_cli \
+  --student-index runs/run_x/activations/student/metadata.jsonl \
+  --teacher-index runs/run_x/activations/teacher/metadata.jsonl \
+  --layer model.layers.0 \
+  --layer model.layers.1 \
+  --ledger runs/run_x/rotations.jsonl
+```
+
+Each CLI invocation computes the before/after cosine similarity across all
+tokens captured for the requested layer(s), logs singular values, and appends
+the summary to the rotation ledger so you can track alignment progress without
+loading the checkpoints themselves.
 
 ## Run scaffolding & dataset ledger
 
