@@ -141,7 +141,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     layer_names = _parse_layer_names(args.layers)
     dumper = ActivationDumper(model, layer_names=layer_names)
     try:
-        saved_paths = dumper.dump_texts(
+        saved_shards = dumper.dump_texts(
             texts=texts,
             tokenizer=tokenizer,
             output_dir=args.output_dir,
@@ -151,9 +151,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         dumper.close()
 
     if args.analyze:
-        for path in saved_paths:
-            stats = summarize_activation_file(path)
-            print(f"\n{path}:")
+        for shard in saved_shards:
+            stats = summarize_activation_file(shard.path)
+            print(f"\n{shard.path}:")
             print(format_summary_table(stats, top_k=None))
 
 
