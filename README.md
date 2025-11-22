@@ -112,7 +112,7 @@ uv run python - <<'PY'
 from model.activation_recorder import load_model_for_activation_recording, record_activations_from_dataset
 
 model, tokenizer = load_model_for_activation_recording(
-    model_name="Qwen/Qwen2.5-7B-Instruct",  # swap in your larger checkpoint if desired
+    model_name="Qwen/Qwen3-32B",
     device="cuda",
     load_in_8bit=True
 )
@@ -123,7 +123,7 @@ record_activations_from_dataset(
     texts=None,                       # force it to read from /samples
     sample_dir="samples",
     save_dir="pruning_output/activations",
-    max_length=512
+    max_length=256
 )
 PY
 ```
