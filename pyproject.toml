@@ -10,6 +10,13 @@ dependencies = [
     "accelerate>=0.30.0",
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
+    "tqdm>=4.66.0",
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+quantization = [
+    "bitsandbytes>=0.41.0",  # For quantization support (Linux/Windows only)
 ]
 
 [tool.pyright]

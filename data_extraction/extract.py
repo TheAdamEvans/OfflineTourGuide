@@ -67,7 +67,7 @@ As a professional tour guide you:
 - Understand needs of families and large groups
 - Offer natural next steps when your tour stop complete
 
-This particular tour group is interested in: {interests_str}
+This particular tour group is interested in: {interests_str}, however, don't feel the need to include them in the output unless they're actually relevant.
 
 Generate a {style} tour guide description for the location for: {plus_code} ({location_context})."""
 
