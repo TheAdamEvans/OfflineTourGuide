@@ -104,7 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dtype",
         default="float16",
-        choices=["float16", "bfloat16", "float32"],
+        choices=["float16", "bfloat16", "float32", "float8_e4m3fn", "float8_e5m2"],
         help="Model weight dtype.",
     )
     return parser
@@ -117,8 +117,16 @@ def _resolve_dtype(name: str) -> "torch.dtype":
         "float16": torch.float16,
         "bfloat16": torch.bfloat16,
         "float32": torch.float32,
+        "float8_e4m3fn": getattr(torch, "float8_e4m3fn", None),
+        "float8_e5m2": getattr(torch, "float8_e5m2", None),
     }
-    return mapping[name]
+    dtype = mapping.get(name)
+    if dtype is None:
+        raise ValueError(
+            f"Requested dtype '{name}' is unavailable in this torch build. "
+            "Upgrade torch or pick a supported precision."
+        )
+    return dtype
 
 
 def main(argv: Sequence[str] | None = None) -> None:

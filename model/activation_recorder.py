@@ -28,24 +28,54 @@ from transport.activation_cache import (
 )
 
 
+_FLOAT8_DTYPES = tuple(
+    dtype
+    for dtype in (
+        getattr(torch, "float8_e4m3fn", None),
+        getattr(torch, "float8_e5m2", None),
+    )
+    if dtype is not None
+)
+
+
 def load_model(
     model_name: str,
     device: Optional[str] = None,
-    dtype: torch.dtype = torch.float16,
+    dtype: Optional[torch.dtype] = torch.float16,
 ) -> Tuple[nn.Module, PreTrainedTokenizerBase]:
     """
     Load a HuggingFace causal LM alongside its tokenizer.
     """
-    resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    use_device_map = device == "auto"
+    resolved_device = None
+    if not use_device_map:
+        resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+
+    model_kwargs = {"trust_remote_code": True}
+    if use_device_map:
+        model_kwargs["device_map"] = "auto"
+        if torch.cuda.is_available():
+            total_mem = torch.cuda.get_device_properties(0).total_memory
+            headroom = int(16 * (1024**3))  # leave ~16 GiB margin for activations/copies
+            limit_bytes = max(total_mem - headroom, int(total_mem * 0.5))
+            limit_gib = max(limit_bytes // (1024**3), 1)
+            model_kwargs["max_memory"] = {
+                0: f"{limit_gib}GiB",
+                "cpu": "1024GiB",
+            }
+    if dtype is not None and dtype not in _FLOAT8_DTYPES:
+        model_kwargs["torch_dtype"] = dtype
+
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=dtype,
-        trust_remote_code=True,
+        **model_kwargs,
     )
 
-    model.to(resolved_device)
+    if resolved_device is not None:
+        model.to(resolved_device)
+
     model.eval()
     return model, tokenizer
 
