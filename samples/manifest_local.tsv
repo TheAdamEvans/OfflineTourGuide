@@ -38,9 +38,9 @@ Paris	8FW4V7JV+4X	fr	Musée du Louvre	samples/8FW4V7JV+4X_fr.txt	improved
 Cairo	7GWHF3RM+7P	ar	جامع الأزهر	samples/7GWHF3RM+7P_ar.txt	improved
 Istanbul	8GHC9H5M+8Q	tr	Sultan Ahmet Camii	samples/8GHC9H5M+8Q_tr.txt	improved
 Rio de Janeiro	588F+5H	pt	Praia de Copacabana	samples/588F+5H_pt.txt	improved
-Tokyo	8Q7XJMFJ+8R	ja	明治神宮	samples/8Q7XJMFJ+8R_ja.txt	pending
-Rome	8FHJVFRV+2C	it	Foro Romano	samples/8FHJVFRV+2C_it.txt	pending
-Mexico City	C9JX+5W	es	Palacio Nacional	samples/C9JX+5W_es.txt	pending
+Tokyo	8Q7XJMFJ+8R	ja	明治神宮	samples/8Q7XJMFJ+8R_ja.txt	improved
+Rome	8FHJVFRV+2C	it	Foro Romano	samples/8FHJVFRV+2C_it.txt	improved
+Mexico City	C9JX+5W	es	Palacio Nacional	samples/C9JX+5W_es.txt	improved
 Seoul	8Q98JW3M+8P	ko	경복궁	samples/8Q98JW3M+8P_ko.txt	improved
 Paris	8FW4V7MX+7C	fr	Sainte-Chapelle	samples/8FW4V7MX+7C_fr.txt	improved
 Cairo	7GWHC22M+5P	ar	أهرامات الجيزة	samples/7GWHC22M+5P_ar.txt	improved
@@ -70,10 +70,10 @@ Sydney	4RRH46V8+74	en	Sydney Opera House	samples/4RRH46V8+74_en.txt	improved
 Sydney	4RRH46P8+8J	en	Royal Botanic Garden	samples/4RRH46P8+8J_en.txt	improved
 Sydney	4RRH46R5+VC	en	The Rocks Market	samples/4RRH46R5+VC_en.txt	improved
 Sydney	4RRH46H6+9J	en	Hyde Park	samples/4RRH46H6+9J_en.txt	improved
-Prague	9F2P3CGJ+8Q	cs	Pražský hrad	samples/9F2P3CGJ+8Q_cs.txt	pending
-Prague	9F2P3C9J+5M	cs	Karlův most	samples/9F2P3C9J+5M_cs.txt	pending
-Prague	9F2P3CCJ+7P	cs	Staroměstské náměstí	samples/9F2P3CCJ+7P_cs.txt	pending
-Prague	9F2P3CGJ+9R	cs	Katedrála svatého Víta	samples/9F2P3CGJ+9R_cs.txt	pending
+Prague	9F2P3CGJ+8Q	cs	Pražský hrad	samples/9F2P3CGJ+8Q_cs.txt	improved
+Prague	9F2P3C9J+5M	cs	Karlův most	samples/9F2P3C9J+5M_cs.txt	improved
+Prague	9F2P3CCJ+7P	cs	Staroměstské náměstí	samples/9F2P3CCJ+7P_cs.txt	improved
+Prague	9F2P3CGJ+9R	cs	Katedrála svatého Víta	samples/9F2P3CGJ+9R_cs.txt	improved
 Amsterdam	9F4698WM+4R	nl	Van Gogh Museum	samples/9F4698WM+4R_nl.txt	pending
 Amsterdam	9F469C3P+8M	nl	Anne Frank Huis	samples/9F469C3P+8M_nl.txt	pending
 Amsterdam	9F469C4P+5M	nl	Grachtengordel	samples/9F469C4P+5M_nl.txt	pending

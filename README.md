@@ -85,6 +85,42 @@ tokens captured for the requested layer(s), logs singular values, and appends
 the summary to the rotation ledger so you can track alignment progress without
 loading the checkpoints themselves.
 
+## Fold transport tensors into a checkpoint
+
+After solving rotations (and optional permutations), describe them in a JSON
+manifest and let the folding CLI update a checkpoint in-place:
+
+```
+uv run python -m transport.apply_transforms \
+  --checkpoint Qwen/Qwen2.5-7B-Instruct \
+  --output-dir runs/run_x/checkpoints/rotated \
+  --spec runs/run_x/transforms.json
+```
+
+Sample `transforms.json`:
+
+```
+{
+  "layers": [
+    {
+      "name": "model.layers.0",
+      "rotation_path": "runs/run_x/rotations/model.layers.0.pt"
+    },
+    {
+      "name": "model.layers.1",
+      "rotation_path": "runs/run_x/rotations/model.layers.1.pt",
+      "head_permutation_path": "runs/run_x/permutations/heads_1.pt",
+      "neuron_permutation_path": "runs/run_x/permutations/neurons_1.pt",
+      "head_dim": 128
+    }
+  ]
+}
+```
+
+The CLI loads the checkpoint (any HuggingFace model id or local directory),
+folds each transform via `WeightTransformSet`, and writes the updated weights +
+tokenizer to `--output-dir`.
+
 ## Run scaffolding & dataset ledger
 
 Before GPU time is available you can still prepare a full `runs/<run_id>` shell
