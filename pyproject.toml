@@ -5,7 +5,7 @@ description = "Add your description here"
 requires-python = "==3.12"
 dependencies = [
     "openlocationcode>=1.0.0",
-    # Optional: Add when using API clients
-    # "openai>=1.0.0",  # For ChatGPT
-    # "anthropic>=0.18.0",  # For Claude
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+    "accelerate>=0.30.0",
 ]
