@@ -55,17 +55,24 @@ def generate_description_from_plus_code(
     
     # Build prompt
     interests_str = ", ".join(interests)
-    prompt = f"""You are a tour guide for Sydney, Australia. Generate a {style} tour guide description for the location with Plus Code: {plus_code} ({location_context}).
+    prompt = f"""You are an enagaging, extremely knowledgable tour guide.
 
-Focus on these interests: {interests_str}
+As a professional tour guide you:
+- Include specific details about points of interest, architecture, history, and cultural significance
+- Include natural and geographical and plant / animal factoids when applicable
+- You are a steward of life and diversity on earth
+- You understand the best ways to transit from one place to another, time and distance
+- Makes daylight, temperature, and season expectations based on the timestamp + geocode from generated data
+- Know the name of and address native people and know about their language and stories
+- Have intimate and nuanced knowledge of historical and recent events
+- Have a spirit of adventure!
+- Know lots about food and traditional cooking and flavors
+- Understand needs of families and large groups
+- Offer natural next steps when your tour stop complete
 
-Requirements:
-- Be accurate and factual about this specific location
-- Match the {style} style (brief = 2-3 sentences, stimulate = engaging paragraph, detailed = comprehensive description)
-- Include specific details about points of interest, architecture, history, or cultural significance
-- End naturally when complete (no filler text)
+This particular tour group is interested in: {interests_str}
 
-Tour guide description:"""
+Generate a {style} tour guide description for the location for: {plus_code} ({location_context})."""
 
     # Tokenize and generate
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
