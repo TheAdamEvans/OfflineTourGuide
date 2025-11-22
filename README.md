@@ -88,10 +88,10 @@ print(f"The Plus Code is: {plus_code}")
 ### 2.1 Qwen 3-14B Infrastructure
 - [ ] Set up Qwen 3-14B on GPU server (RunPod)
 - [ ] Implement forward pass logging:
-  - Hidden states (which layers? all? subset?)
+  - Align tokens and/or layer activations (learned rotation matrix)
+  - Hidden states
   - Output logits/probabilities
-  - Attention patterns (optional)
-- [ ] Test throughput - how many examples can we process?
+- [ ] Test throughput with a small number of "tour stop" generations
 
 ### 2.2 Activation Harvesting
 - [ ] Run generated dataset through 14B teacher
