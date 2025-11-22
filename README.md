@@ -69,27 +69,28 @@ print(f"The Plus Code is: {plus_code}")
 **Goal:** Understand which of the 64 layers are critical for the tour guide task
 
 ## Phase 3: Task-Aware Layer Deletion (Saturday Evening) - **Priority 1 / Main Contribution**
+### 3.0 Token Importance Analysis
+- [ ] Calculate entropy for each token as the model predicts it
+- [ ] Assign a higher weight to high entropy tokens
 
 ### 3.1 Layer Redundancy Analysis
 - [ ] Using activation database from Phase 2:
-  - Compute cosine similarity between consecutive layers (64 layers total)
-  - Identify "redundant" layers (high similarity to neighbors on tour guide task)
+  - Compute cosine similarity between consecutive layers
+  - Identify "redundant" layers
   - Calculate per-layer importance scores:
+    - Activation magnitudes across examples
     - Activation variance across examples
-    - Distance to adjacent layers
-    - Impact on final output (ablation study if time permits)
+  - Calculate per-layer importance scores including token weight
 
 ### 3.2 Strategic Layer Pruning
 - [ ] Delete layers to go from 64 → ~28 layers (to match 3B architecture roughly)
 - [ ] **Novel approach:** Use task-specific activation patterns to decide which layers to cut
-  - Keep early layers (basic language understanding)
-  - Prune middle layers with high similarity (redundant processing)
-  - Keep final layers (output formatting, tour guide specifics)
-- [ ] Implementation:
-  - Load Qwen 3-32B checkpoint
-  - Delete selected layers from model state dict
-  - Re-index remaining layers
-  - Save "chopped" model checkpoint
+  - Approach 1: U-shaped Chop
+    - Keep early layers (basic language understanding)
+    - Prune middle layers with high similarity (redundant processing)
+    - Keep final layers (output formatting, tour guide specifics)
+  - Approach 2: Alternating layer Chop
+    - As a baseline, delete every other layer without regard for activation
 
 ### 3.3 Validation & Analysis
 - [ ] Test chopped model on held-out examples

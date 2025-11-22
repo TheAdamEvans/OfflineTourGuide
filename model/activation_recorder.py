@@ -5,14 +5,57 @@ This module provides hooks to record activations from transformer models,
 which are then used for activation-based pruning analysis.
 """
 
+import gc
 import torch
 import torch.nn as nn
 from typing import Dict, List, Optional, Callable
 from collections import defaultdict
 import numpy as np
 from pathlib import Path
-import json
 import pickle
+
+
+DEFAULT_SAMPLE_DIR = Path(__file__).resolve().parents[1] / "samples"
+
+
+def _sanitize_sample_id(sample_id: str) -> str:
+    """Create a filesystem-safe sample identifier."""
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-+_")
+    sanitized = "".join(ch if ch in allowed else "_" for ch in sample_id)
+    sanitized = sanitized.strip("_")
+    return sanitized or "sample"
+
+
+def _load_sample_texts(sample_dir: Optional[str]) -> List[Dict[str, Optional[str]]]:
+    """
+    Load real tour stop samples from disk.
+    
+    Args:
+        sample_dir: Directory containing .txt samples. Defaults to repo /samples.
+    
+    Returns:
+        List of dicts with id, path, and text fields.
+    """
+    directory = Path(sample_dir or DEFAULT_SAMPLE_DIR)
+    if not directory.exists():
+        raise FileNotFoundError(f"Sample directory {directory} does not exist.")
+    
+    samples: List[Dict[str, Optional[str]]] = []
+    for sample_file in sorted(directory.glob("*.txt")):
+        text = sample_file.read_text(encoding="utf-8").strip()
+        if not text:
+            continue
+        samples.append({
+            "id": sample_file.stem,
+            "path": str(sample_file),
+            "text": text
+        })
+    
+    if not samples:
+        raise ValueError(f"No .txt samples found in {directory}")
+    
+    print(f"Loaded {len(samples)} tour stop samples from {directory}")
+    return samples
 
 
 class ActivationRecorder:
@@ -174,6 +217,15 @@ class ActivationRecorder:
         """Stop recording activations."""
         self.is_recording = False
     
+    def clear_recorded_data(self, clear_cuda_cache: bool = True):
+        """Release recorded tensors to prevent memory growth."""
+        self.activations.clear()
+        self.input_tokens.clear()
+        self.output_tokens.clear()
+        gc.collect()
+        if clear_cuda_cache and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    
     def record_forward_pass(
         self,
         inputs: torch.Tensor,
@@ -202,7 +254,10 @@ class ActivationRecorder:
             self.input_tokens.append(inputs.detach().cpu())
         
         with torch.no_grad():
-            outputs = self.model(inputs if not isinstance(inputs, dict) else inputs)
+            if isinstance(inputs, dict):
+                outputs = self.model(**inputs)
+            else:
+                outputs = self.model(inputs)
         
         # Store output tokens (logits -> token IDs)
         if hasattr(outputs, 'logits'):
@@ -231,7 +286,11 @@ class ActivationRecorder:
         
         return recorded
     
-    def save_activations(self, filename: str = "activations.pkl"):
+    def save_activations(
+        self,
+        filename: str = "activations.pkl",
+        metadata: Optional[Dict[str, Optional[str]]] = None
+    ):
         """
         Save recorded activations to disk in Phase 2 format: {input_tokens, layer_outputs[64], output_tokens}
         """
@@ -240,12 +299,19 @@ class ActivationRecorder:
         
         filepath = self.save_dir / filename
         
+        print(f"Processing and saving activations...")
+        print(f"Found {len(self.activations)} layers with activations")
+        
         # Convert tensors to numpy for serialization
         activations_np = {}
         
         # Store layer outputs (all 64 layers or whatever was recorded)
         layer_outputs = {}
-        for name, activation_list in self.activations.items():
+        layer_names = list(self.activations.keys())
+        for idx, name in enumerate(layer_names):
+            activation_list = self.activations[name]
+            if (idx + 1) % 10 == 0 or idx == 0:
+                print(f"Processing layer {idx+1}/{len(layer_names)}: {name}")
             if activation_list:
                 # Handle variable-length sequences by padding to max length
                 # or computing statistics
@@ -338,7 +404,8 @@ class ActivationRecorder:
             'layer_outputs': layer_outputs,  # Dictionary of all layer outputs
             'output_tokens': output_tokens_data,
             'num_layers': len(layer_outputs),
-            'layer_names': list(layer_outputs.keys())
+            'layer_names': list(layer_outputs.keys()),
+            'metadata': metadata or {}
         }
         
         with open(filepath, 'wb') as f:
@@ -357,9 +424,9 @@ class ActivationRecorder:
         with open(filepath, 'rb') as f:
             activations_np = pickle.load(f)
         
-        # Convert back to tensors
+        layer_outputs = activations_np.get('layer_outputs', {})
         activations = {}
-        for name, data_dict in activations_np.items():
+        for name, data_dict in layer_outputs.items():
             activations[name] = torch.from_numpy(data_dict['data'])
         
         return activations
@@ -370,7 +437,8 @@ def load_model_for_activation_recording(
     device: str = "cuda" if torch.cuda.is_available() else "cpu",
     torch_dtype: torch.dtype = torch.float16,
     load_in_8bit: bool = False,
-    load_in_4bit: bool = False
+    load_in_4bit: bool = False,
+    cache_dir: Optional[str] = None
 ) -> nn.Module:
     """
     Load a model for activation recording.
@@ -384,22 +452,46 @@ def load_model_for_activation_recording(
         torch_dtype: Data type for model weights
         load_in_8bit: Use 8-bit quantization
         load_in_4bit: Use 4-bit quantization
+        cache_dir: Directory to cache downloaded models. Defaults to /workspace/downloads
+                   if it exists, otherwise uses HuggingFace default (~/.cache/huggingface)
     
     Returns:
         Loaded model ready for activation recording
     """
     from transformers import AutoModelForCausalLM, AutoTokenizer
+    import os
+    
+    # Determine cache directory
+    if cache_dir is None:
+        # Default to /workspace/downloads for RunPod/workspace environments
+        default_cache = "/workspace/downloads"
+        # Create directory if it doesn't exist
+        try:
+            os.makedirs(default_cache, exist_ok=True)
+            cache_dir = default_cache
+            print(f"Using cache directory: {cache_dir}")
+        except (OSError, PermissionError):
+            # Fall back to HuggingFace default if we can't create /workspace/downloads
+            cache_dir = None
+            print("Using HuggingFace default cache directory (~/.cache/huggingface)")
     
     print(f"Loading model: {model_name}")
+    if cache_dir:
+        print(f"Model files will be cached in: {cache_dir}")
     
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name, 
+        trust_remote_code=True,
+        cache_dir=cache_dir
+    )
     
     # Load model with appropriate settings
     model_kwargs = {
         "torch_dtype": torch_dtype,
         "device_map": "auto" if device == "cuda" else None,
-        "trust_remote_code": True
+        "trust_remote_code": True,
+        "cache_dir": cache_dir
     }
     
     if load_in_8bit or load_in_4bit:
@@ -432,60 +524,86 @@ def load_model_for_activation_recording(
 def record_activations_from_dataset(
     model: nn.Module,
     tokenizer,
-    texts: List[str],
+    texts: Optional[List[str]] = None,
     batch_size: int = 1,
     max_length: int = 512,
-    save_dir: Optional[str] = None
+    save_dir: Optional[str] = None,
+    sample_dir: Optional[str] = None,
+    pad_to_max_length: bool = True
 ) -> ActivationRecorder:
     """
-    Record activations from a dataset of texts.
+    Record activations from each tour stop sample and persist them per file.
     
     Args:
         model: PyTorch model
         tokenizer: Tokenizer for the model
-        texts: List of input texts
-        batch_size: Batch size for processing
-        max_length: Maximum sequence length
-        save_dir: Directory to save activations
+        texts: Optional list of custom texts. If None, .txt files are loaded from sample_dir.
+        batch_size: Retained for API compatibility (recording is always sequential/per-sample).
+        max_length: Maximum sequence length for tokenization
+        save_dir: Directory to save activation files (one file per sample)
+        sample_dir: Directory containing .txt samples (defaults to repo /samples)
+        pad_to_max_length: Whether to pad to max_length for consistent tensor shapes
     
     Returns:
-        ActivationRecorder with recorded activations
+        ActivationRecorder used for capturing hooks (hooks removed before return)
     """
-    recorder = ActivationRecorder(model, save_dir=save_dir)
+    if save_dir is None:
+        raise ValueError("save_dir must be provided to persist per-sample activations.")
+    
+    save_path = Path(save_dir)
+    save_path.mkdir(parents=True, exist_ok=True)
+    
+    if texts:
+        dataset = [
+            {"id": f"custom_{i:04d}", "path": None, "text": text.strip()}
+            for i, text in enumerate(texts)
+            if text and text.strip()
+        ]
+        print(f"Using {len(dataset)} custom text samples for activation recording.")
+    else:
+        dataset = _load_sample_texts(sample_dir)
+    
+    if not dataset:
+        raise ValueError("No texts available for activation recording.")
+    
+    if batch_size != 1:
+        print("Warning: batch_size > 1 is not supported for sequential sample recording. "
+              "Proceeding with batch_size=1 behavior.")
+    
+    recorder = ActivationRecorder(model, save_dir=str(save_path))
     recorder.register_hooks()
-    recorder.start_recording()
     
-    print(f"Recording activations from {len(texts)} texts...")
+    device = next(model.parameters()).device
     
-    for i, text in enumerate(texts):
-        if (i + 1) % 10 == 0:
-            print(f"Processing text {i+1}/{len(texts)}")
-        
-        # Tokenize with consistent padding
-        inputs = tokenizer(
-            text,
-            return_tensors="pt",
-            max_length=max_length,
-            truncation=True,
-            padding="max_length"  # Use max_length padding for consistent sizes
-        ).to(next(model.parameters()).device)
-        
-        # Store input tokens
-        recorder.input_tokens.append(inputs['input_ids'].detach().cpu())
-        
-        # Forward pass (activations recorded via hooks)
-        with torch.no_grad():
-            outputs = model(**inputs)
-        
-        # Store output tokens (from logits)
-        if hasattr(outputs, 'logits'):
-            output_ids = outputs.logits.argmax(dim=-1)
-            recorder.output_tokens.append(output_ids.detach().cpu())
-    
-    recorder.stop_recording()
-    
-    if save_dir:
-        recorder.save_activations()
+    try:
+        for idx, sample in enumerate(dataset, start=1):
+            sample_text = sample["text"]
+            print(f"[Activation] Processing sample {idx}/{len(dataset)}: {sample['id']}")
+            
+            encoded = tokenizer(
+                sample_text,
+                return_tensors="pt",
+                max_length=max_length,
+                truncation=True,
+                padding="max_length" if pad_to_max_length else False
+            )
+            encoded = {k: v.to(device) for k, v in encoded.items()}
+            
+            recorder.record_forward_pass(encoded)
+            
+            metadata = {
+                "sample_id": sample["id"],
+                "source_file": sample["path"],
+                "text_length": len(sample_text),
+                "max_length": max_length
+            }
+            filename = f"{_sanitize_sample_id(sample['id'])}.pkl"
+            recorder.save_activations(filename=filename, metadata=metadata)
+            recorder.clear_recorded_data()
+            print(f"[Activation] Saved layer outputs to {save_path / filename}")
+    finally:
+        recorder.stop_recording()
+        recorder.remove_hooks()
     
     return recorder
 

@@ -13,7 +13,7 @@ python -m model.example_pruning
 ```
 
 ### For RunPod Deployment
-👉 **See [RUNPOD_SETUP.md](RUNPOD_SETUP.md)** for RunPod setup
+👉 **See [RUNPOD_EXECUTE.md](RUNPOD_EXECUTE.md)** for RunPod execution
 
 ```bash
 # On RunPod with GPU
@@ -23,7 +23,7 @@ python -m model.example_pruning
 ## Documentation
 
 - **[README_LOCAL.md](README_LOCAL.md)** - Running locally (testing, development)
-- **[RUNPOD_SETUP.md](RUNPOD_SETUP.md)** - Running on RunPod (production, large models)
+- **[RUNPOD_EXECUTE.md](RUNPOD_EXECUTE.md)** - Executing on RunPod (production, large models)
 - **[PRUNING_GUIDE.md](PRUNING_GUIDE.md)** - Detailed pruning concepts and workflows
 - **[ACTIVATION_PRUNING_FAQ.md](ACTIVATION_PRUNING_FAQ.md)** - Common questions and answers
 
@@ -71,7 +71,7 @@ run_pruning_pipeline(
 
 1. **Test Locally**: Start with `README_LOCAL.md` using a small model
 2. **Review Analysis**: Check activation analysis results
-3. **Deploy to RunPod**: Use `RUNPOD_SETUP.md` for large models (32B+)
+3. **Deploy to RunPod**: Use `RUNPOD_EXECUTE.md` for large models (32B+)
 4. **Fine-tune**: Recover performance with your training data
 
 ## Support
