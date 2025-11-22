@@ -1,0 +1,28 @@
+{
+  "run_id": "dev_mock",
+  "manifest_path": "runs/dev_mock/manifest.json",
+  "dataset_snapshot": "runs/dev_mock/dataset_snapshot.json",
+  "metrics_output_path": "runs/dev_mock/logs/metrics.jsonl",
+  "checkpoints": [
+    "runs/dev_mock/checkpoints/base.pt",
+    "runs/dev_mock/checkpoints/perm_only.pt",
+    "runs/dev_mock/checkpoints/perm_rot.pt",
+    "runs/dev_mock/checkpoints/perm_rot_style.pt"
+  ],
+  "notes": "Template config demonstrating how to toggle QA features.",
+  "variant": {
+    "permutations": true,
+    "rotations": true,
+    "householder_refinement": false,
+    "prompt_kl": true,
+    "lm_head_ridge": false
+  },
+  "metrics": {
+    "logit_kl": true,
+    "hidden_state_cosine": true,
+    "residual_rms": true,
+    "surprisal": false
+  }
+}
+
+
