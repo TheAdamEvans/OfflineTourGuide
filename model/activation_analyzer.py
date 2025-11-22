@@ -286,6 +286,116 @@ class ActivationAnalyzer:
         num_to_prune = int(len(candidates) * pruning_ratio)
         return candidates[:num_to_prune]
     
+    def compute_layer_similarity_matrix(self) -> Dict[str, np.ndarray]:
+        """
+        Compute cosine similarity matrix between all layers.
+        
+        This is critical for Phase 2/3 to identify redundant layers.
+        High similarity between consecutive layers indicates redundancy.
+        
+        Returns:
+            Dictionary with:
+            - 'similarity_matrix': Full NxN similarity matrix (numpy array)
+            - 'consecutive_similarities': List of (layer_i, layer_i+1, similarity) tuples
+            - 'layer_names': Ordered list of layer names
+        """
+        # Get ordered layer names (sort to ensure consistent ordering)
+        layer_names = sorted(self.activations.keys())
+        num_layers = len(layer_names)
+        
+        if num_layers == 0:
+            return {
+                'similarity_matrix': np.array([]),
+                'consecutive_similarities': [],
+                'layer_names': []
+            }
+        
+        # Initialize similarity matrix
+        similarity_matrix = np.zeros((num_layers, num_layers))
+        
+        # Compute pairwise cosine similarities
+        for i, layer_i in enumerate(layer_names):
+            for j, layer_j in enumerate(layer_names):
+                if i == j:
+                    similarity_matrix[i, j] = 1.0
+                else:
+                    act_i = self.activations[layer_i]
+                    act_j = self.activations[layer_j]
+                    
+                    # Flatten activations to vectors for comparison
+                    # Average over batch/sequence dimensions if present
+                    if len(act_i.shape) > 1:
+                        # Average over all dimensions except the last (hidden dim)
+                        act_i_flat = act_i.view(-1, act_i.shape[-1]).mean(dim=0)
+                    else:
+                        act_i_flat = act_i.flatten()
+                    
+                    if len(act_j.shape) > 1:
+                        act_j_flat = act_j.view(-1, act_j.shape[-1]).mean(dim=0)
+                    else:
+                        act_j_flat = act_j.flatten()
+                    
+                    # Ensure same length (pad or truncate if needed)
+                    min_len = min(len(act_i_flat), len(act_j_flat))
+                    act_i_flat = act_i_flat[:min_len]
+                    act_j_flat = act_j_flat[:min_len]
+                    
+                    # Compute cosine similarity
+                    dot_product = torch.dot(act_i_flat, act_j_flat).item()
+                    norm_i = torch.norm(act_i_flat).item()
+                    norm_j = torch.norm(act_j_flat).item()
+                    
+                    if norm_i > 0 and norm_j > 0:
+                        similarity = dot_product / (norm_i * norm_j)
+                    else:
+                        similarity = 0.0
+                    
+                    similarity_matrix[i, j] = similarity
+        
+        # Extract consecutive layer similarities (for Phase 3 analysis)
+        consecutive_similarities = []
+        for i in range(num_layers - 1):
+            layer_i = layer_names[i]
+            layer_j = layer_names[i + 1]
+            similarity = similarity_matrix[i, i + 1]
+            consecutive_similarities.append((layer_i, layer_j, float(similarity)))
+        
+        return {
+            'similarity_matrix': similarity_matrix,
+            'consecutive_similarities': consecutive_similarities,
+            'layer_names': layer_names
+        }
+    
+    def get_redundant_layers(
+        self,
+        similarity_threshold: float = 0.95,
+        max_layers_to_identify: Optional[int] = None
+    ) -> List[Tuple[str, str, float]]:
+        """
+        Identify redundant layers based on high similarity to adjacent layers.
+        
+        Args:
+            similarity_threshold: Minimum similarity to consider layers redundant (default: 0.95)
+            max_layers_to_identify: Maximum number of redundant pairs to return (None = all)
+        
+        Returns:
+            List of (layer_i, layer_j, similarity) tuples for redundant layer pairs
+        """
+        similarity_data = self.compute_layer_similarity_matrix()
+        consecutive_sims = similarity_data['consecutive_similarities']
+        
+        # Filter by threshold and sort by similarity (highest first)
+        redundant = [
+            (layer_i, layer_j, sim) for layer_i, layer_j, sim in consecutive_sims
+            if sim >= similarity_threshold
+        ]
+        redundant.sort(key=lambda x: x[2], reverse=True)
+        
+        if max_layers_to_identify:
+            redundant = redundant[:max_layers_to_identify]
+        
+        return redundant
+    
     def save_analysis(self, filepath: str):
         """Save analysis results to JSON file."""
         # Convert tensors to lists for JSON serialization
@@ -295,6 +405,17 @@ class ActivationAnalyzer:
                 k: float(v) if isinstance(v, (int, float, np.number)) else v
                 for k, v in metrics.items()
             }
+        
+        # Add similarity matrix if available
+        try:
+            similarity_data = self.compute_layer_similarity_matrix()
+            serializable_metrics['_similarity_matrix'] = {
+                'matrix': similarity_data['similarity_matrix'].tolist(),
+                'consecutive_similarities': similarity_data['consecutive_similarities'],
+                'layer_names': similarity_data['layer_names']
+            }
+        except Exception as e:
+            print(f"Warning: Could not compute similarity matrix: {e}")
         
         with open(filepath, 'w') as f:
             json.dump(serializable_metrics, f, indent=2)

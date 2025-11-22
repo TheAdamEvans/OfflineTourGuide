@@ -23,7 +23,9 @@ def generate_description_from_plus_code(
     plus_code: str,
     interests: List[str],
     style: str,
-    temperature: float = 0.7
+    temperature: float = 0.7,
+    country: str = "Australia",
+    language: str = "English"
 ) -> Dict:
     """
     Query Qwen3-32B FP8 on RunPod to generate a tour guide description for a Plus Code.
@@ -35,6 +37,8 @@ def generate_description_from_plus_code(
         interests: List of interest tags (e.g., ["architecture", "history"])
         style: Style tag ("brief", "stimulate", "detailed")
         temperature: Sampling temperature (default: 0.7)
+        country: Country of origin for tour group (default: "Australia")
+        language: Language for the tour (default: "English")
     
     Returns:
         Dictionary with plus_code, interests, style, and generated response
@@ -51,7 +55,6 @@ def generate_description_from_plus_code(
         location_context = plus_code
     
     # Build prompt
-    interests_str = ", ".join(interests)
     prompt = f"""You are an enagaging, extremely knowledgable tour guide.
 
 As a professional tour guide you:

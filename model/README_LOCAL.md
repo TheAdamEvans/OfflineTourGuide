@@ -28,8 +28,6 @@ cd /path/to/OfflineTourGuide
 
 # Install project dependencies
 uv sync
-# or
-pip install -e .
 ```
 
 ### Step 2: Install Optional Dependencies (Linux/Windows only)
@@ -38,7 +36,7 @@ For quantization support (saves memory):
 
 ```bash
 # Linux/Windows only - not available on macOS
-pip install bitsandbytes
+uv pip install bitsandbytes
 ```
 
 **Note**: On macOS, quantization is not available. Models will use FP16/FP32 instead.
