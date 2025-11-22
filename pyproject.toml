@@ -2,10 +2,29 @@
 name = "offlinetourguide"
 version = "0.1.0"
 description = "Add your description here"
-requires-python = "==3.12"
+requires-python = ">=3.12"
 dependencies = [
     "openlocationcode>=1.0.0",
     "transformers>=4.40.0",
     "torch>=2.0.0",
     "accelerate>=0.30.0",
 ]
+
+[tool.pyright]
+include = ["data_extraction", "main.py", "model"]
+exclude = ["**/__pycache__", "**/node_modules", ".venv", "venv"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImport = true
+reportUnusedVariable = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportDuplicateImport = true
+reportOptionalSubscript = true
+reportOptionalMemberAccess = true
+reportOptionalCall = true
+reportOptionalIterable = true
+reportOptionalContextManager = true
+reportOptionalOperand = true
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
