@@ -1,6 +1,6 @@
 # Running Activation-Based Pruning on RunPod
 
-This guide explains how to run the activation-based pruning pipeline on a RunPod instance.
+This guide provides step-by-step instructions to execute activation-based pruning on a RunPod GPU instance.
 
 ## Prerequisites
 
@@ -11,116 +11,414 @@ This guide explains how to run the activation-based pruning pipeline on a RunPod
 
 2. **Model Access**: Ensure you have access to download Qwen models from HuggingFace
 
-## Setup on RunPod
+## Step-by-Step Execution Guide
 
-### Step 1: Deploy RunPod Instance
+### Step 1: Deploy and Connect to RunPod Instance
 
-1. Go to RunPod dashboard
-2. Deploy a GPU pod (e.g., RTX 4090, A100, etc.)
-3. Choose a template with Python and CUDA support
+1. Go to [RunPod dashboard](https://www.runpod.io/)
+2. Deploy a GPU pod (e.g., RTX 4090 24GB, A100 40GB/80GB)
+3. Choose a template with Python 3.12+ and CUDA support
+4. Connect to your pod via SSH or Jupyter
 
 ### Step 2: Install Dependencies
 
 ```bash
-# Clone or upload your project
-cd /workspace/OfflineTourGuide
+# Navigate to workspace
+cd /workspace
 
-# Install dependencies
-pip install -e .
+# Clone your project (or upload via RunPod's file manager)
+git clone <your-repo-url> OfflineTourGuide
+# OR upload your project files via RunPod's file manager
 
-# Install quantization support (Linux only)
-pip install bitsandbytes
+cd OfflineTourGuide
+
+# Install project dependencies
+uv sync
+
+# Install quantization support (required for memory-efficient loading)
+uv pip install bitsandbytes
+
+# Verify installation
+python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
 ```
 
-### Step 3: Configure for RunPod
+### Step 3: Prepare Activation Texts
 
-Update the example script to use your target model:
-
-```python
-# In model/example_pruning.py, change:
-model_name = "Qwen/Qwen3-32B"  # Your target model
-device = "cuda"  # Always use CUDA on RunPod
-load_in_8bit = True  # Enable quantization to save memory
-```
-
-### Step 4: Run the Pipeline
+Create a file with texts that represent your use case. These will be used to record activations:
 
 ```bash
-# Run the example
-python -m model.example_pruning
+# Create activation texts file
+cat > activation_texts.txt << 'EOF'
+You are an engaging, extremely knowledgeable tour guide.
+Generate a detailed tour guide description for Sydney Opera House.
+This tour group is interested in architecture and history.
+Create a brief tour guide description for Bondi Beach.
+The tour group wants to learn about local culture and food.
+Generate a tour guide description for the Great Barrier Reef.
+This group is interested in marine biology and conservation.
+Create a detailed description for Uluru (Ayers Rock).
+The tour group wants to learn about Indigenous culture.
+Generate a tour guide description for Melbourne's laneways.
+This group is interested in street art and coffee culture.
+EOF
+```
 
-# Or run the full pipeline
+Or use a Python script to generate more diverse texts:
+
+```python
+# prepare_activation_texts.py
+activation_texts = [
+    "You are an engaging, extremely knowledgeable tour guide.",
+    "Generate a detailed tour guide description for Sydney Opera House.",
+    "This tour group is interested in architecture and history.",
+    # Add more texts relevant to your domain
+] * 20  # Repeat for more data points
+
+with open('activation_texts.txt', 'w') as f:
+    for text in activation_texts:
+        f.write(text + '\n')
+```
+
+### Step 4: Execute Pruning - Quick Example
+
+For a quick test run with the example script:
+
+```bash
+# Run the example script (uses default settings)
+python -m model.example_pruning
+```
+
+**Note**: The example script uses hardcoded texts. For production, use the full pipeline (Step 5).
+
+### Step 5: Execute Pruning - Full Pipeline
+
+For production pruning with custom configuration:
+
+#### Option A: Modify the Pipeline Script Directly
+
+Edit `model/pruning_pipeline.py` and update the `__main__` section:
+
+```python
+# At the bottom of model/pruning_pipeline.py
+if __name__ == "__main__":
+    # Load your activation texts
+    with open('activation_texts.txt', 'r') as f:
+        activation_texts = [line.strip() for line in f if line.strip()]
+    
+    run_pruning_pipeline(
+        model_name="Qwen/Qwen3-32B",  # Your target model
+        activation_texts=activation_texts,
+        training_data_file=None,  # Optional: path to training_data.jsonl
+        output_dir="pruning_output",
+        pruning_ratio=0.3,  # Prune 30% of the model
+        num_epochs=3,
+        device="cuda",
+        load_in_8bit=True,  # Enable 8-bit quantization to save memory
+        load_in_4bit=False  # Use 4-bit for even more memory savings if needed
+    )
+```
+
+Then run:
+```bash
 python -m model.pruning_pipeline
 ```
 
-## Memory Considerations
+#### Option B: Use Python API Directly
 
-### For Qwen3-32B:
-- **Full FP16**: ~64GB VRAM
-- **With 8-bit quantization**: ~32GB VRAM
-- **With 4-bit quantization**: ~16GB VRAM
-
-### Recommended Setup:
-- Use **8-bit quantization** for activation recording
-- Use **4-bit quantization** if you have limited VRAM
-- Process activations in smaller batches if needed
-
-## Example RunPod Configuration
+Create a custom script:
 
 ```python
-# model/runpod_pruning_config.py
-RUNPOD_CONFIG = {
-    "model_name": "Qwen/Qwen3-32B",
-    "device": "cuda",
-    "torch_dtype": torch.float16,
-    "load_in_8bit": True,  # Enable quantization
-    "load_in_4bit": False,
-    "batch_size": 1,  # Smaller batches for large models
-    "max_length": 512,
-    "pruning_ratio": 0.3,
-    "num_epochs": 3
-}
+# run_pruning.py
+from model import run_pruning_pipeline
+
+# Load activation texts
+with open('activation_texts.txt', 'r') as f:
+    activation_texts = [line.strip() for line in f if line.strip()]
+
+# Execute pruning
+run_pruning_pipeline(
+    model_name="Qwen/Qwen3-32B",
+    activation_texts=activation_texts,
+    training_data_file=None,  # Optional: "path/to/training_data.jsonl"
+    output_dir="pruning_output",
+    pruning_ratio=0.3,
+    num_epochs=3,
+    device="cuda",
+    load_in_8bit=True,
+    load_in_4bit=False
+)
 ```
 
-## Activation Recording on RunPod
+Run it:
+```bash
+python run_pruning.py
+```
 
-The activation recording will:
-1. Download the model (first time only, ~30-60GB)
-2. Record activations from your input texts
-3. Save activations to disk (~5-20GB depending on model size)
-4. Analyze activations to determine pruning targets
+### Step 6: Monitor Progress
 
-## Tips for RunPod
+The pipeline will output progress for each step:
 
-1. **Use Persistent Storage**: Save activations and models to persistent storage
-2. **Monitor GPU Memory**: Use `nvidia-smi` to monitor VRAM usage
-3. **Batch Processing**: Process activations in batches to avoid OOM errors
-4. **Save Checkpoints**: Save analysis results frequently
-5. **Use Quantization**: Always use 8-bit or 4-bit quantization for large models
+1. **Loading model** - Downloads model if first time (~30-60GB)
+2. **Recording activations** - Processes your texts and saves activations
+3. **Analyzing activations** - Computes importance scores
+4. **Pruning model** - Removes less important layers/neurons
+5. **Fine-tuning** (if training data provided) - Recovers performance
+
+Monitor GPU memory:
+```bash
+# In another terminal or use RunPod's monitoring
+watch -n 1 nvidia-smi
+```
+
+### Step 7: Retrieve Results
+
+After completion, your outputs will be in the `pruning_output` directory:
+
+```bash
+ls -lh pruning_output/
+# You should see:
+# - activations/          # Recorded activation data
+# - analysis.json         # Pruning analysis results
+# - pruned_model.pt       # The pruned model
+# - fine_tuned_model.pt   # Fine-tuned model (if training data was provided)
+```
+
+Download results via RunPod's file manager or SCP:
+```bash
+# From your local machine
+scp -r runpod-pod-id:/workspace/OfflineTourGuide/pruning_output ./local_output/
+```
+
+## Configuration Options
+
+### Model Selection
+
+Choose based on your GPU VRAM:
+
+| Model | VRAM Required (8-bit) | VRAM Required (4-bit) | Disk Space |
+|-------|----------------------|----------------------|------------|
+| Qwen2.5-7B-Instruct | ~14GB | ~8GB | ~15GB |
+| Qwen3-32B | ~32GB | ~16GB | ~60GB |
+
+### Memory Configuration
+
+For different GPU sizes:
+
+**24GB GPU (RTX 4090, A6000):**
+```python
+load_in_8bit=True,   # Use 8-bit quantization
+load_in_4bit=False,
+batch_size=1,
+max_length=512
+```
+
+**40GB GPU (A100 40GB):**
+```python
+load_in_8bit=True,   # Can use 8-bit for Qwen3-32B
+load_in_4bit=False,
+batch_size=2,        # Can use larger batches
+max_length=512
+```
+
+**80GB GPU (A100 80GB):**
+```python
+load_in_8bit=False,  # Can use FP16 for better quality
+load_in_4bit=False,
+batch_size=4,        # Larger batches possible
+max_length=1024      # Longer sequences
+```
+
+### Pruning Ratio
+
+- **0.2 (20%)**: Conservative, minimal quality loss
+- **0.3 (30%)**: Balanced (recommended)
+- **0.5 (50%)**: Aggressive, may need more fine-tuning
+
+## What Happens During Execution
+
+The pipeline executes these steps automatically:
+
+1. **Model Loading** (~5-10 minutes first time)
+   - Downloads model from HuggingFace if not cached
+   - Loads with quantization if specified
+   - Verifies GPU availability
+
+2. **Activation Recording** (~10-30 minutes)
+   - Processes your activation texts through the model
+   - Captures intermediate layer activations
+   - Saves to disk (~5-20GB depending on model size)
+
+3. **Activation Analysis** (~5-15 minutes)
+   - Computes importance scores for each layer/neuron
+   - Identifies pruning candidates based on low activation
+   - Generates analysis report
+
+4. **Model Pruning** (~5-10 minutes)
+   - Removes identified layers/neurons
+   - Reconstructs model architecture
+   - Saves pruned model
+
+5. **Fine-tuning** (optional, ~30-60 minutes per epoch)
+   - Trains pruned model on your data
+   - Recovers performance lost from pruning
+   - Saves checkpoints
+
+## Best Practices
+
+### Storage Management
+
+1. **Use Persistent Storage**: Configure RunPod to use persistent storage for:
+   - Model cache (`~/.cache/huggingface/`)
+   - Output directory (`pruning_output/`)
+   - This prevents re-downloading models on pod restart
+
+2. **Monitor Resources**: Keep an eye on:
+   ```bash
+   # GPU memory
+   watch -n 1 nvidia-smi
+   
+   # Disk space
+   df -h /workspace
+   ```
+
+3. **Save Progress**: The pipeline saves checkpoints automatically, but you can also:
+   - Save activation files separately
+   - Export analysis.json for later review
+   - Keep model checkpoints if fine-tuning
+
+### Performance Optimization
+
+1. **Batch Size**: Start with `batch_size=1`, increase if you have VRAM headroom
+2. **Sequence Length**: Use `max_length=512` for activation recording (can be shorter)
+3. **Quantization**: Always enable 8-bit or 4-bit for models >7B parameters
+4. **Text Diversity**: Use diverse, domain-relevant texts for better pruning decisions
 
 ## Troubleshooting
 
-### Out of Memory (OOM)
-- Reduce batch size
-- Enable 4-bit quantization instead of 8-bit
-- Process fewer texts at once
-- Use gradient checkpointing
+### Out of Memory (OOM) Error
+
+**Symptoms**: `RuntimeError: CUDA out of memory`
+
+**Solutions**:
+```python
+# Option 1: Enable 4-bit quantization
+load_in_4bit=True,
+load_in_8bit=False,
+
+# Option 2: Reduce batch size
+batch_size=1,  # Already minimum, but verify
+
+# Option 3: Reduce sequence length
+max_length=256,  # Instead of 512
+
+# Option 4: Process fewer texts
+activation_texts = activation_texts[:50]  # Limit to 50 texts
+```
 
 ### Disk Space Issues
-- Clean up old model checkpoints
-- Use model caching efficiently
-- Save only essential activations
+
+**Symptoms**: `No space left on device` during model download
+
+**Solutions**:
+```bash
+# Check disk usage
+df -h
+
+# Clean up old models
+rm -rf ~/.cache/huggingface/hub/models--*  # Remove unused models
+
+# Use smaller model for testing
+model_name="Qwen/Qwen2.5-7B-Instruct"  # Instead of 32B
+```
 
 ### Slow Performance
-- Ensure you're using GPU (not CPU)
-- Check CUDA version compatibility
-- Use appropriate batch sizes
 
-## Next Steps
+**Symptoms**: Processing takes much longer than expected
 
-After running on RunPod:
-1. Download the pruned model
-2. Test on your mobile device
-3. Fine-tune further if needed
-4. Deploy to production
+**Check**:
+```python
+# Verify GPU is being used
+import torch
+print(torch.cuda.is_available())  # Should be True
+print(torch.cuda.get_device_name(0))  # Should show your GPU
+
+# Check CUDA version
+python -c "import torch; print(torch.version.cuda)"
+```
+
+**Solutions**:
+- Ensure `device="cuda"` is set
+- Verify CUDA drivers are installed on RunPod
+- Use appropriate batch sizes (not too small, not too large)
+
+### Model Download Fails
+
+**Symptoms**: `ConnectionError` or timeout during model download
+
+**Solutions**:
+```bash
+# Set HuggingFace cache directory with more space
+export HF_HOME=/workspace/.cache/huggingface
+
+# Or use a mirror (if available)
+export HF_ENDPOINT=https://hf-mirror.com
+```
+
+### Activation Recording Fails
+
+**Symptoms**: Error during activation recording step
+
+**Solutions**:
+- Verify activation texts are not empty
+- Check that texts are strings, not other types
+- Ensure sufficient disk space for activations
+- Try with fewer texts first to isolate the issue
+
+## Verifying Results
+
+After execution completes, verify the outputs:
+
+```bash
+# Check outputs exist
+ls -lh pruning_output/
+
+# View analysis results
+cat pruning_output/analysis.json | python -m json.tool | head -50
+
+# Check model file size
+ls -lh pruning_output/pruned_model.pt
+
+# Verify model can be loaded
+python -c "
+import torch
+model = torch.load('pruning_output/pruned_model.pt')
+print(f'Model loaded: {type(model)}')
+"
+```
+
+## Next Steps After Pruning
+
+1. **Download Results**: Use RunPod file manager or SCP to download:
+   - `pruned_model.pt` - The pruned model
+   - `analysis.json` - Pruning analysis for review
+   - `activations/` - Activation data (optional, large files)
+
+2. **Test Locally**: Load and test the pruned model:
+   ```python
+   import torch
+   model = torch.load('pruned_model.pt')
+   # Test inference
+   ```
+
+3. **Fine-tune Further**: If quality is insufficient:
+   - Prepare training data in JSONL format
+   - Re-run pipeline with `training_data_file` parameter
+   - Increase `num_epochs` if needed
+
+4. **Convert for Mobile**: 
+   - Convert to ONNX or other mobile-friendly format
+   - Quantize further if needed
+   - Test on target device
+
+5. **Deploy**: Integrate pruned model into your application
 

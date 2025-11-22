@@ -484,6 +484,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "accelerate" },
+    { name = "bitsandbytes" },
     { name = "numpy" },
     { name = "openlocationcode" },
     { name = "python-dotenv" },
@@ -501,6 +502,7 @@ quantization = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate", specifier = ">=0.30.0" },
+    { name = "bitsandbytes", specifier = ">=0.48.2" },
     { name = "bitsandbytes", marker = "extra == 'quantization'", specifier = ">=0.41.0" },
     { name = "numpy", specifier = ">=1.24.0" },
     { name = "openlocationcode", specifier = ">=1.0.0" },

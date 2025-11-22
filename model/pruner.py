@@ -264,23 +264,73 @@ def create_pruning_plan_from_analysis(
     """
     pruning_plan = {}
     
-    # Get candidates from analyzer
-    candidates = analyzer.get_pruning_candidates(pruning_ratio, strategy)
+    # Ensure metrics are computed
+    if not analyzer.metrics:
+        analyzer.analyze_all_layers()
     
-    # For each layer, determine which neurons to prune
-    for layer_name, score in candidates:
+    # Get layer candidates for pruning
+    layer_candidates = analyzer.get_pruning_candidates(pruning_ratio, strategy)
+    candidate_layer_names = [name for name, _ in layer_candidates]
+    
+    # For each candidate layer, determine which neurons to prune
+    for layer_name in candidate_layer_names:
         if target_layers and layer_name not in target_layers:
             continue
         
-        # Get neuron-level statistics if available
-        metrics = analyzer.metrics.get(layer_name, {})
+        if layer_name not in analyzer.activations:
+            continue
         
-        # For now, use a simple strategy: prune neurons with lowest variance
-        # In practice, you'd want to analyze per-neuron activations
-        # This would require storing per-neuron statistics in the analyzer
+        # Get activation data for this layer
+        activations = analyzer.activations[layer_name]
         
-        # Placeholder: would need per-neuron activation data
-        # For now, return empty plan - user needs to implement per-neuron analysis
-        pass
+        # Flatten to get per-neuron activations
+        # Shape: [batch, seq_len, hidden_dim] or [seq_len, hidden_dim]
+        if len(activations.shape) >= 2:
+            # Average over batch and sequence dimensions to get per-neuron statistics
+            neuron_activations = activations.view(-1, activations.shape[-1])
+            
+            # Compute per-neuron importance scores based on strategy
+            if strategy == "variance":
+                # Prune neurons with lowest variance
+                neuron_variance = torch.var(neuron_activations, dim=0)
+                num_to_prune = int(neuron_variance.shape[0] * pruning_ratio)
+                _, neuron_indices = torch.topk(neuron_variance, num_to_prune, largest=False)
+                neuron_indices_to_prune = neuron_indices.tolist()
+            
+            elif strategy == "sparsity":
+                # Prune neurons with highest sparsity (most inactive)
+                threshold = 1e-6
+                neuron_sparsity = (torch.abs(neuron_activations) < threshold).float().mean(dim=0)
+                num_to_prune = int(neuron_sparsity.shape[0] * pruning_ratio)
+                _, neuron_indices = torch.topk(neuron_sparsity, num_to_prune, largest=True)
+                neuron_indices_to_prune = neuron_indices.tolist()
+            
+            elif strategy == "magnitude":
+                # Prune neurons with lowest average magnitude
+                neuron_magnitude = torch.mean(torch.abs(neuron_activations), dim=0)
+                num_to_prune = int(neuron_magnitude.shape[0] * pruning_ratio)
+                _, neuron_indices = torch.topk(neuron_magnitude, num_to_prune, largest=False)
+                neuron_indices_to_prune = neuron_indices.tolist()
+            
+            else:  # "importance" or default
+                # Use composite importance: combine variance and magnitude
+                neuron_variance = torch.var(neuron_activations, dim=0)
+                neuron_magnitude = torch.mean(torch.abs(neuron_activations), dim=0)
+                
+                # Normalize both to [0, 1] range
+                var_norm = (neuron_variance - neuron_variance.min()) / (neuron_variance.max() - neuron_variance.min() + 1e-8)
+                mag_norm = (neuron_magnitude - neuron_magnitude.min()) / (neuron_magnitude.max() - neuron_magnitude.min() + 1e-8)
+                
+                # Composite score (higher = more important)
+                importance_score = 0.6 * var_norm + 0.4 * mag_norm
+                
+                num_to_prune = int(importance_score.shape[0] * pruning_ratio)
+                _, neuron_indices = torch.topk(importance_score, num_to_prune, largest=False)
+                neuron_indices_to_prune = neuron_indices.tolist()
+            
+            pruning_plan[layer_name] = neuron_indices_to_prune
+        else:
+            # For 1D activations, can't prune neurons
+            pruning_plan[layer_name] = []
     
     return pruning_plan

@@ -29,8 +29,8 @@ def main():
     # Configuration
     # Use a very small model for quick testing
     # For RunPod, you'll use: "Qwen/Qwen3-32B" or "Qwen/Qwen2.5-7B-Instruct"
-    model_name = "Qwen/Qwen2.5-0.5B-Instruct"  # Very small model for testing (~1GB)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model_name = "Qwen/Qwen3-32B"  # Very small model for testing (~1GB)
+    device = "cuda"
     output_dir = Path("pruning_example_output")
     output_dir.mkdir(exist_ok=True)
     
