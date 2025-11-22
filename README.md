@@ -58,6 +58,30 @@ stats = summarize_activation_file("activations/sample_0001.pt")
 print(format_summary_table(stats))
 ```
 
+## Run scaffolding & dataset ledger
+
+Before GPU time is available you can still prepare a full `runs/<run_id>` shell
+plus a frozen snapshot of the ~200 blurbs and prompt/style files:
+
+```
+uv run python -m pipeline.run_scaffolder \
+  --runs-root runs \
+  --prompts-dir prompts \
+  --samples-dir samples
+```
+
+This command will:
+
+1. Hash every prompt/style file in `prompts/`.
+2. Hash every `.txt` sample in `samples/` to form a dataset ledger.
+3. Create `runs/<run_id>/manifest.json`, `dataset_snapshot.json`, `rotations.jsonl`,
+   and subdirectories for checkpoints/activations/logs.
+
+You can override any prompt list with `--prompt path/to/file.md`, set specific run
+ids via `--run-id`, and record tokenizer + commit metadata with
+`--tokenizer-name`, `--tokenizer-version`, `--teacher-commit`, and
+`--student-commit`.
+
 ## Useful flags
 
 ```
