@@ -179,6 +179,7 @@
 - Confirm activation logging doesn't slow down generation too much
 - Wire the local activation dumper to `transport.ActivationShardWriter` so capture jobs emit shard metadata (token spans, checksums) compatible with the rotation pipeline.
 - Once the Python toolchain on the run pod has `pytest` available, run `pytest tests/test_rotations.py` and the `data_extraction.dump_activations --analyze` CLI to validate the synthetic rotation/permutation harness plus new shard format before collecting GPU-scale activations.
+- After both student + teacher shards exist, run `uv run python -m transport.rotation_cli --student-index ... --teacher-index ... --layer ...` to populate `runs/<run_id>/rotations.jsonl` with before/after cosine diagnostics and singular values per layer.
 
 ---
 
