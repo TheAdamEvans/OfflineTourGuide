@@ -177,6 +177,8 @@
 - Extract data about locations in Sydney using RunPod API with Qwen3-32B FP8
 - Implement forward hooks in vLLM to capture layer activations (~82 MB per 256 tokens)
 - Confirm activation logging doesn't slow down generation too much
+- Wire the local activation dumper to `transport.ActivationShardWriter` so capture jobs emit shard metadata (token spans, checksums) compatible with the rotation pipeline.
+- Once the Python toolchain on the run pod has `pytest` available, run `pytest tests/test_rotations.py` and the `data_extraction.dump_activations --analyze` CLI to validate the synthetic rotation/permutation harness plus new shard format before collecting GPU-scale activations.
 
 ---
 

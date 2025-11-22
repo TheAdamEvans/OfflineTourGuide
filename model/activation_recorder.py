@@ -20,6 +20,13 @@ from transformers import (
     PreTrainedTokenizerBase,
 )
 
+from transport.activation_cache import (
+    ActivationShardMetadata,
+    ActivationShardPayload,
+    ActivationShardWriter,
+    TokenSpan,
+)
+
 
 def load_model(
     model_name: str,
@@ -52,6 +59,7 @@ class ActivationDumper:
         self,
         model: nn.Module,
         layer_names: Optional[Sequence[str]] = None,
+        shard_writer: Optional[ActivationShardWriter] = None,
     ) -> None:
         self.model = model.eval()
         self.device = next(self.model.parameters()).device
@@ -59,6 +67,7 @@ class ActivationDumper:
         self.layer_names = list(layer_names) if layer_names else self._infer_layer_names()
         self._handles: List[torch.utils.hooks.RemovableHandle] = []
         self._buffer: Dict[str, torch.Tensor] = {}
+        self._shard_writer = shard_writer
 
         self._register_hooks()
 
@@ -130,14 +139,16 @@ class ActivationDumper:
         output_dir: str | Path,
         max_length: int = 512,
         show_progress: bool = True,
-    ) -> List[Path]:
+    ) -> List[ActivationShardMetadata]:
         """
         Run each text through the model and save activations to disk.
         """
+        writer = self._shard_writer or ActivationShardWriter(output_dir)
         out_dir = Path(output_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        saved_paths: List[Path] = []
+        saved_entries: List[ActivationShardMetadata] = []
+        token_cursor = 0
 
         iterable: Iterable[Tuple[int, str]]
         if show_progress and len(texts) > 1:
@@ -172,23 +183,35 @@ class ActivationDumper:
 
             activations = {name: tensor.clone() for name, tensor in self._buffer.items()}
 
-            sample_path = out_dir / f"sample_{idx:04d}.pt"
             attention_mask = tokenized.get("attention_mask")
             if attention_mask is not None:
                 attention_mask = attention_mask.detach().to("cpu")
 
-            payload = {
-                "text": cleaned,
-                "input_ids": tokenized["input_ids"].detach().to("cpu"),
-                "attention_mask": attention_mask,
-                "activations": activations,
-                "logits": logits,
-            }
+            payload = ActivationShardPayload(
+                input_ids=tokenized["input_ids"].detach().to("cpu"),
+                attention_mask=attention_mask,
+                activations=activations,
+                logits=logits,
+                metadata={
+                    "text": cleaned,
+                    "sample_index": idx,
+                },
+            )
 
-            torch.save(payload, sample_path)
-            saved_paths.append(sample_path)
+            seq_len = int(payload.input_ids.shape[-1])
+            token_span = TokenSpan(start=token_cursor, end=token_cursor + seq_len)
+            token_cursor += seq_len
 
-        return saved_paths
+            layer_names = list(activations.keys()) or list(self.layer_names)
+            shard_metadata = writer.write_shard(
+                payload,
+                token_span=token_span,
+                layer_names=layer_names,
+                shard_id=f"sample_{idx:04d}",
+            )
+            saved_entries.append(shard_metadata)
+
+        return saved_entries
 
 
 __all__ = ["ActivationDumper", "load_model"]
