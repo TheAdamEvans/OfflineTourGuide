@@ -40,70 +40,7 @@
 
 **Goal:** Understand which of the 64 layers are critical for the tour guide task
 
-## Phase 3: Task-Aware Layer Deletion (Saturday Evening) - **Priority 1 / Main Contribution**
-### 3.0 Token Importance Analysis
-- [ ] Calculate entropy for each token as the model predicts it
-- [ ] Assign a higher weight to high entropy tokens
-
-### 3.1 Layer Redundancy Analysis
-- [ ] Using activation database from Phase 2:
-  - Compute cosine similarity between consecutive layers
-  - Identify "redundant" layers
-  - Calculate per-layer importance scores:
-    - Activation magnitudes across examples
-    - Activation variance across examples
-  - Calculate per-layer importance scores including token weight
-
-### 3.2 Strategic Layer Pruning
-- [ ] Delete layers to go from 64 → ~28 layers (to match 3B architecture roughly)
-- [ ] **Novel approach:** Use task-specific activation patterns to decide which layers to cut
-  - Approach 1: U-shaped Chop
-    - Keep early layers (basic language understanding)
-    - Prune middle layers with high similarity (redundant processing)
-    - Keep final layers (output formatting, tour guide specifics)
-  - Approach 2: Alternating layer Chop
-    - As a baseline, delete every other layer without regard for activation
-
-### 3.3 Validation & Analysis
-- [ ] Test chopped model on held-out examples
-- [ ] Check if it still generates coherent output (even if degraded)
-- [ ] **This is the main contribution:** Demonstrate that task-aware layer deletion preserves performance better than blind pruning
-- [ ] Log examples: compare 32B → chopped model outputs
-- [ ] Document which layers were kept/deleted and why
-
-**Goal:** Show that activation-guided pruning beats random layer deletion
-
-## Phase 4: Width Pruning Exploration (Saturday Late/Sunday Morning) - **Priority 2 / If Time Allows**
-
-### 4.1 Neuron-Level Importance Scoring
-- [ ] Using activation database from Phase 2:
-  - Rank attention heads by average activation magnitude (64 heads per layer)
-  - Rank FFN neurons by variance across examples (25,600 dims per layer)
-  - Identify low-importance neurons/heads for pruning
-
-### 4.2 Structured Width Reduction
-- [ ] **Goal:** Aggressive width pruning (~60% reduction) guided by activations
-- [ ] Prune attention heads:
-  - Keep top ~40% of heads per layer based on importance scores
-  - Adjust attention computation for smaller head count
-- [ ] Prune FFN dimensions:
-  - Keep top ~40% of intermediate FFN neurons
-  - Reduce hidden dimension size accordingly (5120 → ~2048)
-- [ ] Implementation challenges:
-  - Weight matrix surgery (removing rows/columns)
-  - Maintaining architectural consistency
-  - Potential need for calibration/fine-tuning
-
-### 4.3 Risk Management
-- [ ] **High risk:** This may break the model entirely at 60%+ reduction
-- [ ] Fallback plan: If width pruning fails, demo Phase 3 results (layer deletion only)
-- [ ] If time permits: Light distillation/fine-tuning on chopped model to recover performance
-
-**Goal:** Explore how far we can push width reduction using activation-guided pruning
-
----
-
-## Phase 5: Evaluation Strategy for Tour Guide Model Pruning
+## Phase 3: Evaluation Strategy for Tour Guide Model Pruning
 
 ### 5.1 Core Concept
 - [ ] Treat evaluation as a direct measurement of how pruning impacts the model's ability to behave like a tour guide.
@@ -136,7 +73,67 @@
 - [ ] Actionable: high surprisal on specific tokens guides which layers/neurons should be restored.
 - [ ] Philosophy: a viable pruned model should not be "surprised" by standard tour-guide narratives; if it is, pruning went too far.
 
----
+
+## Phase 4: Task-Aware Layer Deletion (Saturday Evening) - **Priority 1 / Main Contribution**
+### 3.0 Token Importance Analysis
+- [ ] Calculate entropy for each token as the model predicts it
+- [ ] Assign a higher weight to high entropy tokens
+
+### 4.1 Layer Redundancy Analysis
+- [ ] Using activation database from Phase 2:
+  - Compute cosine similarity between consecutive layers
+  - Identify "redundant" layers
+  - Calculate per-layer importance scores:
+    - Activation magnitudes across examples
+    - Activation variance across examples
+  - Calculate per-layer importance scores including token weight
+
+### 4.2 Strategic Layer Pruning
+- [ ] Delete layers to go from 64 → ~28 layers (to match 3B architecture roughly)
+- [ ] **Novel approach:** Use task-specific activation patterns to decide which layers to cut
+  - Approach 1: U-shaped Chop
+    - Keep early layers (basic language understanding)
+    - Prune middle layers with high similarity (redundant processing)
+    - Keep final layers (output formatting, tour guide specifics)
+  - Approach 2: Alternating layer Chop
+    - As a baseline, delete every other layer without regard for activation
+
+### 4.3 Validation & Analysis
+- [ ] Test chopped model on held-out examples
+- [ ] Check if it still generates coherent output (even if degraded)
+- [ ] **This is the main contribution:** Demonstrate that task-aware layer deletion preserves performance better than blind pruning
+- [ ] Log examples: compare 32B → chopped model outputs
+- [ ] Document which layers were kept/deleted and why
+
+**Goal:** Show that activation-guided pruning beats random layer deletion
+
+## Phase 5: Width Pruning Exploration (Saturday Late/Sunday Morning) - **Priority 2 / If Time Allows**
+
+### 5.1 Neuron-Level Importance Scoring
+- [ ] Using activation database from Phase 2:
+  - Rank attention heads by average activation magnitude (64 heads per layer)
+  - Rank FFN neurons by variance across examples (25,600 dims per layer)
+  - Identify low-importance neurons/heads for pruning
+
+### 5.2 Structured Width Reduction
+- [ ] **Goal:** Aggressive width pruning (~60% reduction) guided by activations
+- [ ] Prune attention heads:
+  - Keep top ~40% of heads per layer based on importance scores
+  - Adjust attention computation for smaller head count
+- [ ] Prune FFN dimensions:
+  - Keep top ~40% of intermediate FFN neurons
+  - Reduce hidden dimension size accordingly (5120 → ~2048)
+- [ ] Implementation challenges:
+  - Weight matrix surgery (removing rows/columns)
+  - Maintaining architectural consistency
+  - Potential need for calibration/fine-tuning
+
+### 5.3 Risk Management
+- [ ] **High risk:** This may break the model entirely at 60%+ reduction
+- [ ] Fallback plan: If width pruning fails, demo Phase 3 results (layer deletion only)
+- [ ] If time permits: Light distillation/fine-tuning on chopped model to recover performance
+
+**Goal:** Explore how far we can push width reduction using activation-guided pruning
 
 ## Phase 6: Inference Server & Demo (Sunday Afternoon)
 
