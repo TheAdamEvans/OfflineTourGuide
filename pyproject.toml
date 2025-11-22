@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [tool.pyright]
-include = ["data_extraction", "main.py", "model"]
+include = ["data_extraction", "main.py", "model", "pipeline"]
 exclude = ["**/__pycache__", "**/node_modules", ".venv", "venv"]
 reportMissingImports = true
 reportMissingTypeStubs = false
