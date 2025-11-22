@@ -1,0 +1,11 @@
+[project]
+name = "offlinetourguide"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "openlocationcode>=1.0.0",
+    # Optional: Add when using API clients
+    # "openai>=1.0.0",  # For ChatGPT
+    # "anthropic>=0.18.0",  # For Claude
+]
