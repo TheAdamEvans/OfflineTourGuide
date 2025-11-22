@@ -69,12 +69,29 @@ class ActivationRecorder:
                 # Store activation statistics
                 if isinstance(output, torch.Tensor):
                     # Detach and move to CPU to save memory
-                    self.activations[name].append(output.detach().cpu())
+                    # Store mean over batch dimension to handle variable lengths
+                    # Shape: [batch, seq_len, hidden_dim] -> [seq_len, hidden_dim]
+                    if len(output.shape) >= 2:
+                        # Average over batch dimension if present
+                        if output.shape[0] == 1:
+                            # Single batch, remove batch dim
+                            self.activations[name].append(output.squeeze(0).detach().cpu())
+                        else:
+                            # Multiple batches, average them
+                            self.activations[name].append(output.mean(dim=0).detach().cpu())
+                    else:
+                        self.activations[name].append(output.detach().cpu())
                 elif isinstance(output, tuple):
                     # Handle tuple outputs (e.g., attention outputs)
                     for i, out in enumerate(output):
                         if isinstance(out, torch.Tensor):
-                            self.activations[f"{name}_output_{i}"].append(out.detach().cpu())
+                            if len(out.shape) >= 2:
+                                if out.shape[0] == 1:
+                                    self.activations[f"{name}_output_{i}"].append(out.squeeze(0).detach().cpu())
+                                else:
+                                    self.activations[f"{name}_output_{i}"].append(out.mean(dim=0).detach().cpu())
+                            else:
+                                self.activations[f"{name}_output_{i}"].append(out.detach().cpu())
         return hook
     
     def register_hooks(self):
@@ -129,8 +146,16 @@ class ActivationRecorder:
         recorded = {}
         for name, activation_list in self.activations.items():
             if activation_list:
-                # Stack all activations from this layer
-                recorded[name] = torch.cat(activation_list, dim=0)
+                # For single forward pass, just return the first (and likely only) activation
+                if len(activation_list) == 1:
+                    recorded[name] = activation_list[0]
+                elif len(activation_list) > 1:
+                    # If multiple, stack them (they should be same size from same forward pass)
+                    try:
+                        recorded[name] = torch.stack(activation_list, dim=0)
+                    except RuntimeError:
+                        # If sizes don't match, just take the first one
+                        recorded[name] = activation_list[0]
         
         return recorded
     
@@ -145,13 +170,42 @@ class ActivationRecorder:
         activations_np = {}
         for name, activation_list in self.activations.items():
             if activation_list:
-                # Stack and convert to numpy
-                stacked = torch.cat(activation_list, dim=0)
-                activations_np[name] = {
-                    'data': stacked.numpy(),
-                    'shape': list(stacked.shape),
-                    'dtype': str(stacked.dtype)
-                }
+                # Handle variable-length sequences by padding to max length
+                # or computing statistics
+                if len(activation_list) > 0:
+                    # Get max sequence length
+                    max_seq_len = max(act.shape[0] if len(act.shape) >= 1 else 1 
+                                     for act in activation_list if act.numel() > 0)
+                    
+                    # Pad all activations to same length and stack
+                    padded_list = []
+                    for act in activation_list:
+                        if len(act.shape) == 0:
+                            continue
+                        seq_len = act.shape[0]
+                        if seq_len < max_seq_len:
+                            # Pad with zeros
+                            padding_size = max_seq_len - seq_len
+                            if len(act.shape) == 1:
+                                padding = torch.zeros(padding_size, dtype=act.dtype)
+                                padded = torch.cat([act, padding], dim=0)
+                            else:
+                                padding_shape = (padding_size,) + act.shape[1:]
+                                padding = torch.zeros(padding_shape, dtype=act.dtype)
+                                padded = torch.cat([act, padding], dim=0)
+                            padded_list.append(padded)
+                        else:
+                            padded_list.append(act)
+                    
+                    if padded_list:
+                        # Stack all padded activations
+                        stacked = torch.stack(padded_list, dim=0)
+                        activations_np[name] = {
+                            'data': stacked.numpy(),
+                            'shape': list(stacked.shape),
+                            'dtype': str(stacked.dtype),
+                            'original_lengths': [act.shape[0] for act in activation_list if len(act.shape) >= 1]
+                        }
         
         with open(filepath, 'wb') as f:
             pickle.dump(activations_np, f)
@@ -273,13 +327,13 @@ def record_activations_from_dataset(
         if (i + 1) % 10 == 0:
             print(f"Processing text {i+1}/{len(texts)}")
         
-        # Tokenize
+        # Tokenize with consistent padding
         inputs = tokenizer(
             text,
             return_tensors="pt",
             max_length=max_length,
             truncation=True,
-            padding=True
+            padding="max_length"  # Use max_length padding for consistent sizes
         ).to(next(model.parameters()).device)
         
         # Forward pass (activations recorded via hooks)
