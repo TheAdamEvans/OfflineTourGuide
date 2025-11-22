@@ -259,7 +259,7 @@ Once validated locally, deploy to RunPod for:
 - More disk space
 - Better GPU resources
 
-See `RUNPOD_SETUP.md` for RunPod instructions.
+See `RUNPOD_EXECUTE.md` for RunPod execution instructions.
 
 ## Memory-Saving Tips
 
@@ -281,7 +281,7 @@ See `RUNPOD_SETUP.md` for RunPod instructions.
 
 - Check `PRUNING_GUIDE.md` for detailed pruning concepts
 - See `ACTIVATION_PRUNING_FAQ.md` for common questions
-- Review `RUNPOD_SETUP.md` for production deployment
+- Review `RUNPOD_EXECUTE.md` for production execution
 
 ## Example: Complete Local Run
 
@@ -306,5 +306,5 @@ cat pruning_example_output/analysis.json | python -m json.tool | head -50
 - **CPU Mode**: Works but very slow (expect 10-100x slower than GPU)
 - **macOS**: Quantization not available, but everything else works
 
-For production use with large models (32B+), see `RUNPOD_SETUP.md`.
+For production use with large models (32B+), see `RUNPOD_EXECUTE.md`.
 

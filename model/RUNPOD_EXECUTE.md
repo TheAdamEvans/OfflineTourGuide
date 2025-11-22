@@ -1,4 +1,4 @@
-# Running Activation-Based Pruning on RunPod
+# Executing Activation-Based Pruning on RunPod
 
 This guide provides step-by-step instructions to execute activation-based pruning on a RunPod GPU instance.
 
@@ -85,7 +85,7 @@ For a quick test run with the example script:
 
 ```bash
 # Run the example script (uses default settings)
-python -m model.example_pruning
+uv run python -m model.example_pruning
 ```
 
 **Note**: The example script uses hardcoded texts. For production, use the full pipeline (Step 5).
@@ -268,9 +268,11 @@ The pipeline executes these steps automatically:
 ### Storage Management
 
 1. **Use Persistent Storage**: Configure RunPod to use persistent storage for:
-   - Model cache (`~/.cache/huggingface/`)
+   - Model cache (`/workspace/downloads/` - models are automatically downloaded here)
    - Output directory (`pruning_output/`)
    - This prevents re-downloading models on pod restart
+
+   **Note**: The Qwen3-32B model files are automatically downloaded to `/workspace/downloads/` when you run the pruning pipeline. Make sure to mount a persistent volume at `/workspace/downloads` to avoid re-downloading models on pod restart.
 
 2. **Monitor Resources**: Keep an eye on:
    ```bash
@@ -357,8 +359,10 @@ python -c "import torch; print(torch.version.cuda)"
 
 **Solutions**:
 ```bash
-# Set HuggingFace cache directory with more space
-export HF_HOME=/workspace/.cache/huggingface
+# Models are automatically downloaded to /workspace/downloads
+# Ensure this directory exists and has sufficient space:
+mkdir -p /workspace/downloads
+df -h /workspace/downloads  # Check available space
 
 # Or use a mirror (if available)
 export HF_ENDPOINT=https://hf-mirror.com
