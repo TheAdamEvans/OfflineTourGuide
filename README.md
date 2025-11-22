@@ -125,3 +125,25 @@ python -m data_extraction.dump_activations --help
 That is the entire surface area—record and inspect activations without any
 pruning or fine-tuning extras.
 
+## QA toggles, metrics, and reporting
+
+- Configure which transport modules/metrics are enabled via `config/eval_template.json`
+  (copy per run and edit checkpoint paths, variant toggles, etc.). The dataclasses live
+  in `config/evaluation.py` and can be loaded from JSON or TOML.
+- The notebook `notebooks/qa_toggle_metrics.ipynb` consumes that config, iterates
+  over checkpoints, and writes placeholder metric rows (`logit_kl`, `hidden_state_cosine`,
+  `residual_rms`, `surprisal`) to `runs/<run_id>/logs/metrics.jsonl`. Replace the stub
+  helpers with real evaluations once activations are ready.
+- Generate polished QA summaries (tables + seaborn plots) by running:
+
+  ```bash
+  uv run python -m pipeline.report_generator \
+    --run-id run_YYYYMMDD \
+    --runs-root runs \
+    --mock  # drop this flag once real metrics exist
+  ```
+
+  The script ingests `manifest.json` + metrics JSONL, renders a Markdown report, and saves
+  metric plots to `runs/<run_id>/figures/metric_trends.png`.
+
+
