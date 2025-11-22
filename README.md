@@ -10,7 +10,7 @@ for a handful of tour-stop style prompts so you can inspect them offline.
 uv sync
 
 # Dumps to ./activations by default using the sample texts in ./samples
-uv run python -m data_extraction.dump_activations --model Qwen/Qwen2.5-7B-Instruct
+uv run python -m data_extraction.dump_activations --model Qwen/Qwen3-7B
 ```
 
 The script will:
@@ -64,7 +64,7 @@ print(format_summary_table(stats))
 python -m data_extraction.dump_activations --help
 ```
 
-- ``--model`` – HuggingFace id to load (default: ``Qwen/Qwen2.5-7B-Instruct``)
+- ``--model`` – HuggingFace id to load (default: ``Qwen/Qwen3-7B``)
 - ``--dtype`` – Weight precision (float16 / bfloat16 / float32)
 - ``--device`` – Torch device string (defaults to auto)
 - ``--output-dir`` – Where ``sample_XXXX.pt`` files are stored

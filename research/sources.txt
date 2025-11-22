@@ -1,0 +1,3 @@
+orthogonal CCA/PCA alignment for multilingual encoders
+Li et al.’s attention head matching
+Householder-based stabilization in TinyStories distills
