@@ -102,11 +102,17 @@ print(f"The Plus Code is: {plus_code}")
 
 ### 3.1 Qwen 3-3B Training Setup
 - [ ] Initialize Qwen 3-3B student model
+- [ ] Create layer mapping between teacher and student model
+  - Early layers: Match more precisely (basic syntax)
+  - Middle layers: Can skip more teacher layers here
+  - Final layers: Match closely again (task-specific output formatting)
 - [ ] Implement distillation loss:
   - KL divergence on output logits (temperature tuning?)
   - MSE on hidden states (layer-wise matching via symmetry)
-  - Cross-entropy on ground truth (student also learns from targets)
-  - **Weighting:** Balance these loss components
+  - **Weighting:** Balance these loss components?
+  - Make sure distillation loss properly masks padding and stops at EOS tokens
+- [ ] NO cross-entropy on ground truth
+  - No need for student to also learn from targets
 
 ### 3.2 Training Loop
 - [ ] Start training with small batch to verify
@@ -114,6 +120,7 @@ print(f"The Plus Code is: {plus_code}")
   - Loss convergence
   - **Stop token generation** (critical!)
   - Output quality on held-out examples
+  - Log activation matching (cosine similarity between projected teacher and student hiddens)
 - [ ] Iterate on hyperparameters if time permits
 
 ## Phase 4: Inference Server & Demo (Sunday Morning)
@@ -142,6 +149,7 @@ print(f"The Plus Code is: {plus_code}")
   - Style selector (brief/stimulate/detailed)
   - Display generated tour guide text
 - [ ] Pre-generate some example queries for demo stability
+- [ ] Try for cities that the model hasn't seen, like New York
 
 ---
 
