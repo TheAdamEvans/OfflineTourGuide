@@ -181,6 +181,10 @@
 - Once the Python toolchain on the run pod has `pytest` available, run `pytest tests/test_rotations.py` and the `data_extraction.dump_activations --analyze` CLI to validate the synthetic rotation/permutation harness plus new shard format before collecting GPU-scale activations.
 - After both student + teacher shards exist, run `uv run python -m transport.rotation_cli --student-index ... --teacher-index ... --layer ...` to populate `runs/<run_id>/rotations.jsonl` with before/after cosine diagnostics and singular values per layer.
 
+#### Activation capture follow-ups
+- [ ] Export `HF_HOME=/workspace/.hf_home` and `HF_HUB_CACHE=/workspace/.hf_home/hub` in the startup script so large checkpoints land on the shared workspace volume.
+- [ ] Switch activation runs to the reference `Qwen/Qwen3-32B` via vLLM for streaming inference, avoiding per-layer decompression OOMs.
+
 ---
 
 ## Success Criteria (Sunday 2pm)
