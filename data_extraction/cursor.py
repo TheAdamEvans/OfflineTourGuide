@@ -1,39 +1,117 @@
 """
-Data extraction pipeline for getting location data and Plus Codes from Qwen3-32B FP8 using vLLM on RunPod.
+Cursor API functions - UNUSED
 
-Two approaches:
-1. Generate descriptions FROM Plus Codes (primary workflow)
-2. Extract location data TO create Plus Codes (alternative workflow)
+This module contains functions for calling the Cursor API.
+These functions are kept for reference but are not currently used in the project.
+We now use RunPod API to call qwen3-32b FP8 model instead.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from openlocationcode.openlocationcode import encode, decode
 import openlocationcode.openlocationcode as olc
+import requests
 
-from .runpod_utils import call_vllm_api
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    raise ImportError(
+        "python-dotenv is required. Install it with: pip install python-dotenv"
+    )
 
-# ============================================================================
-# APPROACH 1: Generate descriptions FROM Plus Codes (Primary Workflow)
-# ============================================================================
+# Load environment variables
+load_dotenv()
+
+CURSOR_API_KEY = os.getenv('CURSOR_API_KEY')
+CURSOR_API_BASE_URL = 'https://api.cursor.com/v1'
 
 
-def generate_description_from_plus_code(
+def get_cursor_api_key() -> str:
+    """
+    Get Cursor API key from environment variables.
+    
+    Returns:
+        API key string
+        
+    Raises:
+        ValueError: If API key is not found in environment
+    """
+    if not CURSOR_API_KEY:
+        raise ValueError(
+            "CURSOR_API_KEY not found. Please set it in your .env file."
+        )
+    return CURSOR_API_KEY
+
+
+def call_cursor_api(
+    prompt: str,
+    model: str = "gpt-4",
+    temperature: float = 0.7,
+    max_tokens: int = 2000
+) -> str:
+    """
+    Call Cursor API chat completions endpoint to get AI-generated responses.
+    
+    Args:
+        prompt: The prompt to send to the API
+        model: Model to use (default: "gpt-4")
+        temperature: Sampling temperature (default: 0.7)
+        max_tokens: Maximum tokens to generate (default: 2000)
+    
+    Returns:
+        Generated text response from the API
+        
+    Raises:
+        ValueError: If API key is not configured
+        requests.RequestException: If API call fails
+    """
+    api_key = get_cursor_api_key()
+    
+    url = f"{CURSOR_API_BASE_URL}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens
+    }
+    
+    response = requests.post(url, headers=headers, json=payload, timeout=60)
+    response.raise_for_status()
+    
+    result = response.json()
+    return result["choices"][0]["message"]["content"]
+
+
+def generate_description_from_plus_code_cursor(
     plus_code: str,
     interests: List[str],
     style: str,
+    model: str = "gpt-4",
     temperature: float = 0.7
 ) -> Dict:
     """
-    Query Qwen3-32B FP8 on RunPod to generate a tour guide description for a Plus Code.
+    Query Cursor API to generate a tour guide description for a Plus Code.
     
-    This is the main data generation approach from Phase 1.3.
+    This is an alternative to using Qwen3-32B for data generation.
     
     Args:
         plus_code: Plus Code string (e.g., "4RRH+Q8 Sydney")
         interests: List of interest tags (e.g., ["architecture", "history"])
         style: Style tag ("brief", "stimulate", "detailed")
+        model: Cursor API model to use (default: "gpt-4")
         temperature: Sampling temperature (default: 0.7)
     
     Returns:
@@ -41,7 +119,6 @@ def generate_description_from_plus_code(
     """
     
     # Convert Plus Code back to approximate coordinates for context
-    # (Plus Codes can be decoded to get lat/long)
     try:
         code_area = olc.decode(plus_code)
         lat = code_area.latitudeCenter
@@ -50,9 +127,9 @@ def generate_description_from_plus_code(
     except:
         location_context = plus_code
     
-    # Build prompt
+    # Build prompt (same as Qwen version)
     interests_str = ", ".join(interests)
-    prompt = f"""You are an enagaging, extremely knowledgable tour guide.
+    prompt = f"""You are an engaging, extremely knowledgeable tour guide.
 
 As a professional tour guide you:
 - Include specific details about points of interest, architecture, history, and cultural significance
@@ -74,9 +151,10 @@ Generate a {style} tour guide description for the location for: {plus_code} ({lo
     # Set max tokens based on style
     max_tokens = 200 if style == "brief" else 500 if style == "stimulate" else 1500
     
-    # Call vLLM API on RunPod
-    generated_text = call_vllm_api(
+    # Call Cursor API
+    generated_text = call_cursor_api(
         prompt=prompt,
+        model=model,
         temperature=temperature,
         max_tokens=max_tokens
     )
@@ -89,21 +167,19 @@ Generate a {style} tour guide description for the location for: {plus_code} ({lo
     }
 
 
-# ============================================================================
-# APPROACH 2: Extract location data TO create Plus Codes (Alternative)
-# ============================================================================
-
-def extract_poi_list_from_qwen(
+def extract_poi_list_from_cursor(
     area: str,
+    model: str = "gpt-4",
     temperature: float = 0.3
 ) -> List[Dict]:
     """
-    Query Qwen3-32B FP8 on RunPod to get a list of POIs in an area, then convert to Plus Codes.
+    Query Cursor API to get a list of POIs in an area, then convert to Plus Codes.
     
     This is useful for discovering locations before generating descriptions.
     
     Args:
         area: Area name (e.g., "Sydney CBD", "Bondi Beach")
+        model: Cursor API model to use (default: "gpt-4")
         temperature: Sampling temperature (default: 0.3)
     
     Returns:
@@ -122,9 +198,10 @@ Format as JSON array with keys: name, latitude, longitude, description, category
 
 Return ONLY valid JSON, no additional text."""
 
-    # Call vLLM API on RunPod
-    result = call_vllm_api(
+    # Call Cursor API
+    result = call_cursor_api(
         prompt=prompt,
+        model=model,
         temperature=temperature,
         max_tokens=2000
     )
@@ -163,22 +240,19 @@ Return ONLY valid JSON, no additional text."""
     return results
 
 
-# ============================================================================
-# Batch Generation Pipeline
-# ============================================================================
-
-def generate_training_dataset(
+def generate_training_dataset_cursor(
     plus_codes: List[str],
     interests_list: List[List[str]],
     styles: List[str],
-    output_file: str = "training_data.jsonl",
+    output_file: str = "training_data_cursor.jsonl",
     text_output_dir: Optional[str] = None,
+    model: str = "gpt-4",
     temperature: float = 0.7
 ) -> None:
     """
-    Generate training dataset by querying Qwen3-32B FP8 on RunPod for each Plus Code combination.
+    Generate training dataset by querying Cursor API for each Plus Code combination.
     
-    This implements Phase 1.3 of the plan.
+    This is an alternative to using Qwen3-32B for data generation.
     
     Args:
         plus_codes: List of Plus Code strings
@@ -186,6 +260,7 @@ def generate_training_dataset(
         styles: List of style tags
         output_file: Output JSONL file path
         text_output_dir: Optional directory to save individual text files
+        model: Cursor API model to use (default: "gpt-4")
         temperature: Sampling temperature (default: 0.7)
     """
     
@@ -200,10 +275,11 @@ def generate_training_dataset(
                     print(f"Generating: {plus_code} | {interests} | {style}")
                     
                     try:
-                        result = generate_description_from_plus_code(
+                        result = generate_description_from_plus_code_cursor(
                             plus_code=plus_code,
                             interests=interests,
                             style=style,
+                            model=model,
                             temperature=temperature
                         )
                         
@@ -228,6 +304,4 @@ def generate_training_dataset(
                     except Exception as e:
                         print(f"Error generating {plus_code}: {e}")
                         continue
-
-
 

@@ -1,4 +1,4 @@
 """
-Model utilities for Qwen3-14B and related functionality.
+Model utilities for Qwen3-32B FP8 and related functionality.
 """
 

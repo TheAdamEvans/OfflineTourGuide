@@ -1,10 +1,9 @@
 """
-Example usage of the data extraction pipeline with Qwen3-14B.
+Example usage of the data extraction pipeline with Qwen3-32B FP8 on RunPod.
 """
 
 import openlocationcode as olc
 from extract import (
-    load_qwen_model,
     generate_training_dataset,
     generate_description_from_plus_code
 )
@@ -12,17 +11,13 @@ from extract import (
 
 def example_single_generation():
     """Example: Generate a single description."""
-    print("Loading Qwen3-14B model...")
-    model, tokenizer = load_qwen_model(device="cuda")
+    print("Using Qwen3-32B FP8 on RunPod...")
     
     # Generate description for a specific Plus Code
     result = generate_description_from_plus_code(
         plus_code="4RRH+Q8 Sydney",
         interests=["architecture", "history"],
-        style="detailed",
-        model=model,
-        tokenizer=tokenizer,
-        device="cuda"
+        style="detailed"
     )
     
     print("\nGenerated Description:")
@@ -34,8 +29,7 @@ def example_single_generation():
 
 def example_batch_generation():
     """Example: Generate training dataset with text file output."""
-    print("Loading Qwen3-14B model...")
-    model, tokenizer = load_qwen_model(device="cuda")
+    print("Using Qwen3-32B FP8 on RunPod...")
     
     # Generate Plus Codes for Sydney locations
     sydney_locations = [
@@ -51,11 +45,8 @@ def example_batch_generation():
         plus_codes=plus_codes,
         interests_list=[["architecture"], ["history", "culture"], ["nature"]],
         styles=["brief", "stimulate", "detailed"],
-        model=model,
-        tokenizer=tokenizer,
         output_file="training_data.jsonl",
-        text_output_dir="output_texts",  # Saves individual .txt files
-        device="cuda"
+        text_output_dir="output_texts"  # Saves individual .txt files
     )
     
     print("\nGeneration complete!")
