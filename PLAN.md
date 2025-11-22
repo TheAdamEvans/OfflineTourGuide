@@ -1,6 +1,10 @@
 # Offline Tour Guide - Model Compression Hackathon Plan
 
-**Goal:** Compress Qwen 3-32B FP8 → 3B using **activation-guided pruning** for Sydney POI descriptions using Plus Codes, controllable via style tags
+> **Note:** This file documents the original compression project. The active
+> codebase has since been stripped down to a simple activation dumping tool, so
+> most of the steps below are preserved only for historical context.
+
+**Goal:** Compress Qwen 3-32B FP8 → 3B using **activation-guided pruning** for POI descriptions using Plus Codes and Smantic Geographic coding.
 
 **Approach:** Task-aware layer deletion + width pruning (vs. traditional distillation)
 
@@ -42,31 +46,31 @@
 
 ## Phase 3: Evaluation Strategy for Tour Guide Model Pruning
 
-### 5.1 Core Concept
+### 3.1 Core Concept
 - [ ] Treat evaluation as a direct measurement of how pruning impacts the model's ability to behave like a tour guide.
 - [ ] Compare progressively pruned checkpoints (layer deletion + width reduction) against a high-quality, human-written corpus of tour descriptions.
 
-### 5.2 Key Metric: Surprisal on Ground Truth
+### 3.2 Key Metric: Surprisal on Ground Truth
 - [ ] Feed ground truth tour narratives into each model checkpoint instead of sampling generations.
 - [ ] Record token-level surprisal/perplexity and track how the metric drifts as pruning intensifies.
 - [ ] Use surprisal because it reflects whether the model still assigns high probability to canonical tour-guide phrasing and factual statements.
 
-### 5.3 Test Set Design
+### 3.3 Test Set Design
 - [ ] `seen_cities/` – fresh landmarks from cities already used in training (Sydney, Xian).
 - [ ] `unseen_similar/` – culturally or geographically adjacent cities (Melbourne, Beijing).
 - [ ] `unseen_different/` – cities with very different styles or context (New York, Barcelona).
 - [ ] `edge_cases/` – challenging architectural styles or narratives (Reykjavik, Dubai).
 
-### 5.4 What We're Looking For
+### 3.4 What We're Looking For
 - [ ] Acceptable: small surprisal bumps on common structure/function words while factual tokens remain stable.
 - [ ] Unacceptable: sharp spikes on architectural terminology (e.g., "Romanesque Revival"), proper nouns ("George McRae"), numbers/dates ("1898"), or city-specific cues.
 
-### 5.5 Decision Criteria
+### 3.5 Decision Criteria
 - [ ] Pass if mean perplexity increase < 20% on `seen_cities/`.
 - [ ] Pass if maximum surprisal on factual tokens is < 2× the baseline model.
 - [ ] Fail immediately if any file shows catastrophic loss (perplexity > 1000).
 
-### 5.6 Why This Works
+### 3.6 Why This Works
 - [ ] Efficient: avoids subjective human rating loops while still using human-written references.
 - [ ] Targeted: directly measures retention of tour-guide language and factual grounding.
 - [ ] Granular: token-level surprisal highlights whether style vs. knowledge degraded.
@@ -128,30 +132,20 @@
   - Maintaining architectural consistency
   - Potential need for calibration/fine-tuning
 
-### 5.3 Risk Management
-- [ ] **High risk:** This may break the model entirely at 60%+ reduction
-- [ ] Fallback plan: If width pruning fails, demo Phase 3 results (layer deletion only)
-- [ ] If time permits: Light distillation/fine-tuning on chopped model to recover performance
+### 5.3 Model Averaging
+- [ ] We will break the model entirely at 60%+ reduction
+  - Could we simply average the new model in with the old model
 
 **Goal:** Explore how far we can push width reduction using activation-guided pruning
 
 ## Phase 6: Inference Server & Demo (Sunday Afternoon)
 
-### 6.1 Serving Infrastructure
-- [ ] Deploy chopped model (from Phase 3/4) on RunPod GPU
-- [ ] Build FastAPI endpoint:
-  ```
-  POST /tour-guide
-  {
-    "latitude": -33.8688,
-    "longitude": 151.2093,
-    "interests": ["architecture", "history"],
-    "style": "detailed"
-  }
-  → Convert to Plus Code
-  → Format input for chopped model
-  → Return generated description
-  ```
+### 6.1 Presentation
+- Slide 1: Offline Tour Guide
+- Slide 2: Data Generation
+- Slide 3: Evaluation
+- Slide 4: Method: Model Chopping
+- Slide 5: Results
 
 ### 6.2 Web Demo
 - [ ] Simple web interface:
