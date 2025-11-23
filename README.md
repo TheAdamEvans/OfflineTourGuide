@@ -209,6 +209,18 @@ Validation checklist:
 All shards still include `metadata.jsonl` entries, so downstream rotation / transport tooling
 continues to work without changes.
 
+### GPU capture gotchas (Nov 2025)
+
+The current vLLM releases (≥0.11) shuffled a few internals, so keep these in mind:
+
+1. **Single-process mode required for hooks** – `vllm.LLM` now launches multi-process workers by default, which hides the `model_executor` we reach into for attaching hooks. Export `VLLM_ENABLE_V1_MULTIPROCESSING=0` before running `data_extraction.dump_activations --backend vllm ...` so the driver exposes the old single-process worker objects.
+2. **Forward context + positions** – When you bypass the scheduler to call the model directly (what `ActivationDumper` does), you must supply the same forward context vLLM would normally create (`vllm.forward_context.set_forward_context(...)`) and match its position tensors. The helper in `model/vllm_activation_recorder.py` now accepts a custom `forward_runner`, but Qwen3 still errors with `rotary_embedding(...): query, key and positions must have the same number of tokens`. Until we mirror vLLM's internal `positions` buffers, expect this path to fail.
+3. **Fallback to torch backend when blocked** – You can always fall back to the plain PyTorch backend on a big GPU:  
+   `uv run python -m data_extraction.dump_activations --backend torch --model Qwen/Qwen3-32B --device cuda --dtype float16 --output-dir /workspace/activations ...`. This produces the same shard format (`metadata.jsonl` + `sample_XXXX.pt`) without relying on vLLM internals.
+4. **Write to the persistent mount** – The pod only persists `/workspace`, so point `--output-dir` at `/workspace/activations` (already created in this repo) to avoid losing shards between restarts.
+
+If you pick up the vLLM debugging again, start by logging the scheduler-built `positions` tensors inside `vllm/v1/worker` to replicate them inside `_make_forward_runner`, then re-enable CUDA graphs once everything lines up.
+
 ## QA toggles, metrics, and reporting
 
 - Configure which transport modules/metrics are enabled via `config/eval_template.json`
