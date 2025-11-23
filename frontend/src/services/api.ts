@@ -32,7 +32,7 @@ export async function* streamChatCompletion(
       },
       body: JSON.stringify({
         // model: 'Qwen/Qwen2.5-3B',
-        model: 'qwen3_pseudo3b',
+        model: 'runs/qwen3_pseudo3b',
         messages: messages,
         stream: true,
         temperature: 0.7,

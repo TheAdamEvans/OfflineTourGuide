@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tunnel": "npx instatunnel 3000 --subdomain showmearound",
+    "tunnel": "npx instatunnel 3000 --subdomain showme",
+    "tunnel:random": "npx instatunnel 3000",
     "tunnel:ngrok": "ngrok http 3000 --domain=showmearound.ngrok-free.app --basic-auth=\"showmearound:yesyesyes\""
   },
   "dependencies": {

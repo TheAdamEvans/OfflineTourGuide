@@ -12,11 +12,10 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0', // Explicitly bind to all network interfaces
     strictPort: true,
-    allowedHosts: [
-      'showmearound.instatunnel.my',
-    ],
+    // Removed allowedHosts to allow any instatunnel subdomain (useful for random subdomains)
     hmr: {
-      host: 'showmearound.instatunnel.my', // Use tunnel hostname for HMR WebSocket
+      // Let Vite auto-detect the HMR host from the request
+      // This works better with tunnels that may have dynamic hostnames
       protocol: 'wss', // Use secure WebSocket through tunnel
       clientPort: 443 // Tunnel uses HTTPS/WSS on port 443
     }
