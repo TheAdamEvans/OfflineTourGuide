@@ -1,27 +1,22 @@
 """
-Data extraction module for generating tour guide descriptions from Plus Codes.
+Thin wrapper that lazily exposes the activation dumping CLI.
 """
 
-from .extract import (
-    generate_description_from_plus_code,
-    extract_poi_list_from_qwen,
-    generate_training_dataset
-)
+from __future__ import annotations
 
-from .runpod_utils import (
-    call_vllm_api,
-    get_runpod_api_key,
-    get_runpod_endpoint,
-    get_model_name
-)
+from typing import Sequence
 
-__all__ = [
-    'generate_description_from_plus_code',
-    'extract_poi_list_from_qwen',
-    'generate_training_dataset',
-    'call_vllm_api',
-    'get_runpod_api_key',
-    'get_runpod_endpoint',
-    'get_model_name'
-]
 
+def build_parser():
+    from .dump_activations import build_parser as _build
+
+    return _build()
+
+
+def main(argv: Sequence[str] | None = None):
+    from .dump_activations import main as _main
+
+    return _main(argv)
+
+
+__all__ = ["build_parser", "main"]

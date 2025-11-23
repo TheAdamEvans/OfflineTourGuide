@@ -1,0 +1,4 @@
+orthogonal CCA/PCA alignment for multilingual encoders
+canonical paper on SVCCA alignment
+Li et al.’s attention head matching
+Householder-based stabilization in TinyStories distills
