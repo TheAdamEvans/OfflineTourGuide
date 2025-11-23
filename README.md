@@ -13,6 +13,24 @@ uv sync
 uv run python -m data_extraction.dump_activations --model Qwen/Qwen3-7B
 ```
 
+### Persistent Hugging Face cache
+
+All shells should write Hugging Face artifacts to `/workspace/.hf_home` so
+large checkpoints survive pod restarts and don't fill ephemeral disks. Add the
+exports once (e.g., append to `~/.bashrc` or your RunPod startup script) and
+reload your shell:
+
+```bash
+mkdir -p /workspace/.hf_home/hub
+echo 'export HF_HOME=/workspace/.hf_home' >> ~/.bashrc
+echo 'export HF_HUB_CACHE=/workspace/.hf_home/hub' >> ~/.bashrc
+source ~/.bashrc
+
+# verification
+env | grep HF_
+ls -lh /workspace/.hf_home
+```
+
 The script will:
 
 1. Load the requested HuggingFace model.
@@ -157,9 +175,39 @@ python -m data_extraction.dump_activations --help
 - ``--output-dir`` – Where ``sample_XXXX.pt`` files are stored
 - ``--layer`` – Optional module names if you only want specific hooks
 - ``--max-length`` – Token limit while tokenizing prompts
+- ``--backend`` – ``torch`` (default) or ``vllm`` for GPU-friendly capture
+- ``--hf-home`` / ``--hf-hub-cache`` – Override the persistent HF cache paths if needed
+- ``--vllm-*`` – Tensor parallel size, GPU utilization cap, max context, eager toggle
 
 That is the entire surface area—record and inspect activations without any
 pruning or fine-tuning extras.
+
+## GPU activation capture with vLLM
+
+The vLLM backend stands up the reference `Qwen/Qwen3-32B` checkpoint on the RTX 6000
+Ada, registers the same forward hooks, and streams shards directly to the persistent
+workspace cache. Sample run using the bilingual canned prompts:
+
+```bash
+uv run python -m data_extraction.dump_activations \
+  --backend vllm \
+  --model Qwen/Qwen3-32B \
+  --dtype float16 \
+  --text-file samples/generic_en.txt \
+  --text-file samples/generic_zh.txt \
+  --output-dir activations/qwen3_32b_gpu \
+  --max-length 640 \
+  --analyze
+```
+
+Validation checklist:
+
+- `ls -lh /workspace/.hf_home` – proves Hugging Face downloads land on the workspace disk.
+- `nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv` – shows the GPU is driving the run.
+- The `--analyze` table shouts per-layer magnitudes immediately after capture.
+
+All shards still include `metadata.jsonl` entries, so downstream rotation / transport tooling
+continues to work without changes.
 
 ## QA toggles, metrics, and reporting
 
