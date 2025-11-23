@@ -1,0 +1,28 @@
+{
+  "name": "offline-tour-guide-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tunnel": "npx instatunnel 3000 --subdomain showmearound",
+    "tunnel:ngrok": "ngrok http 3000 --domain=showmearound.ngrok-free.app --basic-auth=\"showmearound:yesyesyes\""
+  },
+  "dependencies": {
+    "open-location-code": "^1.0.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "reverse-geocode": "^1.3.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-basic-ssl": "^1.0.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "instatunnel": "^1.1.3",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8"
+  }
+}
