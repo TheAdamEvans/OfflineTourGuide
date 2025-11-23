@@ -159,13 +159,7 @@
 
 ---
 
-## Open Questions / TODO
-
-### Data Generation Details
-- **Sampling density formula:** Population-weighted? POI count-weighted?
-- **Geographic scope:** Just Sydney CBD? Include suburbs? How far out?
-- **Interest distribution:** Equal sampling or weight toward common interests?
-- **Validation strategy:** How do we verify Claude/GPT outputs are accurate?
+## TODO
 
 ### Model Compression Specifics
 - **Layer similarity metric:** Cosine similarity? CKA? Other?
@@ -174,7 +168,7 @@
 - **Quantization:** Do we quantize the chopped model for faster inference?
 
 ### Immediate TODOs
-- Extract data about locations in Sydney using RunPod API with Qwen3-32B FP8
+✅ Extract data about locations in Sydney using RunPod API with Qwen3-32B FP8
 - Implement forward hooks in vLLM to capture layer activations (~82 MB per 256 tokens)
 - Confirm activation logging doesn't slow down generation too much
 - Wire the local activation dumper to `transport.ActivationShardWriter` so capture jobs emit shard metadata (token spans, checksums) compatible with the rotation pipeline.
@@ -182,8 +176,10 @@
 - After both student + teacher shards exist, run `uv run python -m transport.rotation_cli --student-index ... --teacher-index ... --layer ...` to populate `runs/<run_id>/rotations.jsonl` with before/after cosine diagnostics and singular values per layer.
 
 #### Activation capture follow-ups
-- [ ] Export `HF_HOME=/workspace/.hf_home` and `HF_HUB_CACHE=/workspace/.hf_home/hub` in the startup script so large checkpoints land on the shared workspace volume.
-- [ ] Switch activation runs to the reference `Qwen/Qwen3-32B` via vLLM for streaming inference, avoiding per-layer decompression OOMs.
+- [x] Export `HF_HOME=/workspace/.hf_home` and `HF_HUB_CACHE=/workspace/.hf_home/hub` in every shell (`~/.bashrc` or RunPod startup) and verify with `env | grep HF_` + `ls -lh /workspace/.hf_home`.
+- [x] Run `uv run python -m data_extraction.dump_activations --backend vllm --model Qwen/Qwen3-32B --text-file samples/generic_en.txt --text-file samples/generic_zh.txt --output-dir activations/qwen3_32b_gpu --max-length 640 --analyze` to exercise the GPU capture path end-to-end.
+- [ ] Track GPU health during long captures: `watch -n 2 nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv`.
+- [ ] Plan for a larger GPU (≥80 GB VRAM or 2×48 GB with TP=2) before retrying the vLLM capture—single 48 GB cards OOM during Qwen3-32B (fp16/fp8) load.
 
 ---
 
