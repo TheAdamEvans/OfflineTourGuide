@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import contextlib
 from pathlib import Path
-from typing import List, Optional, Sequence
+from types import SimpleNamespace
+from typing import Dict, List, Optional, Sequence
 
+import torch
 from torch import nn
 from transformers import AutoTokenizer, PreTrainedTokenizerBase
 
@@ -16,6 +18,8 @@ from transport.activation_cache import ActivationShardMetadata
 
 try:
     from vllm import LLM
+    from vllm.config import VllmConfig
+    from vllm.forward_context import set_forward_context
 except ImportError as exc:  # pragma: no cover - surfaced at runtime
     raise RuntimeError(
         "The vLLM backend requires the `vllm` package. Install it via `uv pip install vllm`."
@@ -83,7 +87,15 @@ class VLLMActivationRecorder:
             model_name, trust_remote_code=True
         )
         torch_model = _resolve_worker_model(self.llm)
-        self._dumper = ActivationDumper(torch_model, layer_names=layer_names)
+        forward_runner = None
+        if hasattr(torch_model, "compute_logits"):
+            vllm_config = getattr(getattr(self.llm, "llm_engine", None), "vllm_config", None)
+            forward_runner = _make_forward_runner(vllm_config)
+        self._dumper = ActivationDumper(
+            torch_model,
+            layer_names=layer_names,
+            forward_runner=forward_runner,
+        )
 
     def dump_texts(
         self,
@@ -107,6 +119,34 @@ class VLLMActivationRecorder:
         if engine and hasattr(engine, "shutdown"):
             with contextlib.suppress(Exception):
                 engine.shutdown()
+
+
+def _make_forward_runner(vllm_config: Optional[VllmConfig]):
+    if vllm_config is None:
+        return None
+
+    def _runner(model: nn.Module, tokenized: Dict[str, torch.Tensor]):
+        input_ids = tokenized["input_ids"]
+        batch, seq_len = input_ids.shape
+        positions = torch.arange(seq_len, device=input_ids.device, dtype=torch.long)
+        num_tokens = int(input_ids.numel())
+        with set_forward_context(
+            attn_metadata=None,
+            vllm_config=vllm_config,
+            num_tokens=num_tokens,
+        ):
+            hidden_states = model(
+                input_ids=input_ids,
+                positions=positions,
+                intermediate_tensors=None,
+                inputs_embeds=None,
+            )
+        if isinstance(hidden_states, tuple):
+            hidden_states = hidden_states[0]
+        logits = model.compute_logits(hidden_states)
+        return SimpleNamespace(logits=logits)
+
+    return _runner
 
 
 __all__ = ["VLLMActivationRecorder"]
