@@ -10,7 +10,7 @@ inspection.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch
 from torch import nn
@@ -80,6 +80,13 @@ def load_model(
     return model, tokenizer
 
 
+ForwardRunner = Callable[[nn.Module, Dict[str, torch.Tensor]], object]
+
+
+def _default_forward_runner(model: nn.Module, tokenized: Dict[str, torch.Tensor]):
+    return model(**tokenized)
+
+
 class ActivationDumper:
     """
     Register forward hooks on transformer blocks and persist their outputs.
@@ -90,6 +97,7 @@ class ActivationDumper:
         model: nn.Module,
         layer_names: Optional[Sequence[str]] = None,
         shard_writer: Optional[ActivationShardWriter] = None,
+        forward_runner: Optional[ForwardRunner] = None,
     ) -> None:
         self.model = model.eval()
         self.device = next(self.model.parameters()).device
@@ -98,6 +106,7 @@ class ActivationDumper:
         self._handles: List[torch.utils.hooks.RemovableHandle] = []
         self._buffer: Dict[str, torch.Tensor] = {}
         self._shard_writer = shard_writer
+        self._forward_runner = forward_runner or _default_forward_runner
 
         self._register_hooks()
 
@@ -207,7 +216,7 @@ class ActivationDumper:
 
             self._buffer.clear()
             with torch.no_grad():
-                outputs = self.model(**tokenized)
+                outputs = self._forward_runner(self.model, tokenized)
 
             logits = outputs.logits.detach().to("cpu", torch.float32)
 
