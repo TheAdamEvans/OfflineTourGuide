@@ -180,6 +180,9 @@
 - [x] Run `uv run python -m data_extraction.dump_activations --backend vllm --model Qwen/Qwen3-32B --text-file samples/generic_en.txt --text-file samples/generic_zh.txt --output-dir activations/qwen3_32b_gpu --max-length 640 --analyze` to exercise the GPU capture path end-to-end.
 - [ ] Track GPU health during long captures: `watch -n 2 nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv`.
 - [ ] Plan for a larger GPU (≥80 GB VRAM or 2×48 GB with TP=2) before retrying the vLLM capture—single 48 GB cards OOM during Qwen3-32B (fp16/fp8) load.
+- [ ] Mirror vLLM's scheduler-built `positions` / forward-context metadata inside `_make_forward_runner` so the rotary kernels stop erroring about token counts.
+- [ ] Re-run the `generic_en` + `generic_zh` shards through the vLLM backend (with CUDA graphs) once the forward runner is fixed, and compare throughput vs. the torch fallback.
+- [ ] Double-check that `/workspace/activations` stays the canonical output target in docs/scripts so shards land on the persistent mount.
 
 ---
 
