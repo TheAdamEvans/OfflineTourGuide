@@ -1,503 +1,245 @@
-# OfflineTourGuide
+# OfflineTourGuide (Activation Dumps)
 
-Model to generate guided experiences from facts and figures encoded in the weights directly.
+The previous pruning and finetuning experiments have been removed. What remains
+is a small, dependency-light script that helps capture transformer activations
+for a handful of tour-stop style prompts so you can inspect them offline.
 
-GPS coordinates provided by the user are mapped into Plus Codes, then the model learns to be a tour guide for that location (given the plus code). 
-
-**Example Plus Code:** `JJXX+HR8, Seattle`
-
-## How It Works
-
-GPS coordinates are converted to Plus Codes using the Open Location Code library:
-
-```python
-import openlocationcode as olc
-
-# Define the latitude and longitude
-latitude = 34.43125
-longitude = 8.77625
-
-# Encode the coordinates into a Plus Code
-# You can specify the desired length (e.g., 10 for ~14x14 meter area)
-plus_code = olc.encode(latitude, longitude, codeLength=10)
-
-print(f"The Plus Code is: {plus_code}")
-```
-
-## Running on RunPod
-
-This guide provides step-by-step instructions to execute activation-based pruning on a RunPod GPU instance.
-
-### Prerequisites
-
-1. **RunPod GPU Instance** with:
-   - At least 24GB VRAM (for Qwen2.5-7B) or 80GB+ VRAM (for Qwen3-32B)
-   - At least 100GB free disk space
-   - Linux environment (required for bitsandbytes quantization)
-
-2. **Model Access**: Ensure you have access to download Qwen models from HuggingFace
-
-### Step 1: Deploy and Connect to RunPod Instance
-
-1. Go to [RunPod dashboard](https://www.runpod.io/)
-2. Deploy a GPU pod (e.g., RTX 4090 24GB, A100 40GB/80GB)
-3. Choose a template with Python 3.12+ and CUDA support
-4. Connect to your pod via SSH or Jupyter
-
-### Step 2: Install Dependencies
+## Quick start
 
 ```bash
-# Navigate to workspace
-cd /workspace
-
-# Clone your project (or upload via RunPod's file manager)
-git clone <your-repo-url> OfflineTourGuide
-# OR upload your project files via RunPod's file manager
-
-cd OfflineTourGuide
-
-# Install project dependencies
 uv sync
 
-# Install quantization support (required for memory-efficient loading)
-uv pip install bitsandbytes
-
-# Verify installation
-python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
+# Dumps to ./activations by default using the sample texts in ./samples
+uv run python -m data_extraction.dump_activations --model Qwen/Qwen3-7B
 ```
 
-### Step 3: Prepare Activation Texts
+### Persistent Hugging Face cache
 
-Create a file with texts that represent your use case. These will be used to record activations:
+All shells should write Hugging Face artifacts to `/workspace/.hf_home` so
+large checkpoints survive pod restarts and don't fill ephemeral disks. Add the
+exports once (e.g., append to `~/.bashrc` or your RunPod startup script) and
+reload your shell:
 
 ```bash
-# Create activation texts file
-cat > activation_texts.txt << 'EOF'
-You are an engaging, extremely knowledgeable tour guide.
-Generate a detailed tour guide description for Sydney Opera House.
-This tour group is interested in architecture and history.
-Create a brief tour guide description for Bondi Beach.
-The tour group wants to learn about local culture and food.
-Generate a tour guide description for the Great Barrier Reef.
-This group is interested in marine biology and conservation.
-Create a detailed description for Uluru (Ayers Rock).
-The tour group wants to learn about Indigenous culture.
-Generate a tour guide description for Melbourne's laneways.
-This group is interested in street art and coffee culture.
-EOF
+mkdir -p /workspace/.hf_home/hub
+echo 'export HF_HOME=/workspace/.hf_home' >> ~/.bashrc
+echo 'export HF_HUB_CACHE=/workspace/.hf_home/hub' >> ~/.bashrc
+source ~/.bashrc
+
+# verification
+env | grep HF_
+ls -lh /workspace/.hf_home
 ```
 
-Or use a Python script to generate more diverse texts:
+The script will:
+
+1. Load the requested HuggingFace model.
+2. Register forward hooks on every transformer block.
+3. Run each sample text through the model.
+4. Save each sample as a shard (``activations/sample_XXXX.pt`` + a row in
+   ``activations/metadata.jsonl``) that includes the text, token ids, logits,
+   and raw activations per layer alongside token-span + checksum metadata so
+   downstream rotation/permutation tooling can stream the data.
+
+> Every shard recorded through ``ActivationShardWriter`` gets an entry in
+> ``metadata.jsonl`` describing the token range, covered layers, tensor dtype,
+> and SHA256 checksum. This JSONL file is what the rotation CLI parses later
+> to solve PCA/Procrustes transports layer by layer.
+
+## Custom inputs
+
+- Add or update ``.txt`` files in ``./samples``.
+- Provide one-off prompts:
+
+  ```bash
+  uv run python -m data_extraction.dump_activations \
+    --text "Describe the Sydney Opera House for architecture fans." \
+    --text "Give a short Bondi Beach blurb for food lovers."
+  ```
+
+- Point at a newline-delimited file:
+
+  ```bash
+  uv run python -m data_extraction.dump_activations --text-file my_prompts.txt
+  ```
+
+## Basic visibility checks
+
+Pass ``--analyze`` to print per-layer statistics right after recording. Each
+metric is intentionally simple (mean / max absolute activation) so you can get
+a quick feel for which layers are lighting up without running a heavier
+pipeline.
+
+```
+uv run python -m data_extraction.dump_activations --analyze
+```
+
+You can also analyze an existing shard directly:
 
 ```python
-# prepare_activation_texts.py
-activation_texts = [
-    "You are an engaging, extremely knowledgeable tour guide.",
-    "Generate a detailed tour guide description for Sydney Opera House.",
-    "This tour group is interested in architecture and history.",
-    # Add more texts relevant to your domain
-] * 20  # Repeat for more data points
+from model.activation_analyzer import summarize_activation_file, format_summary_table
 
-with open('activation_texts.txt', 'w') as f:
-    for text in activation_texts:
-        f.write(text + '\n')
+stats = summarize_activation_file("activations/sample_0001.pt")
+print(format_summary_table(stats))
 ```
 
-### Step 4: Record Activations (Source of Truth)
+## Rotation diagnostics
 
-**This is the canonical way to record activations:**
+Once you have both student and teacher activation shards recorded (with their
+`metadata.jsonl` files), run the rotation sanity check to estimate PCA +
+Procrustes transports per layer and append cosine diagnostics to a ledger:
+
+```
+uv run python -m transport.rotation_cli \
+  --student-index runs/run_x/activations/student/metadata.jsonl \
+  --teacher-index runs/run_x/activations/teacher/metadata.jsonl \
+  --layer model.layers.0 \
+  --layer model.layers.1 \
+  --ledger runs/run_x/rotations.jsonl
+```
+
+Each CLI invocation computes the before/after cosine similarity across all
+tokens captured for the requested layer(s), logs singular values, and appends
+the summary to the rotation ledger so you can track alignment progress without
+loading the checkpoints themselves.
+
+## Fold transport tensors into a checkpoint
+
+After solving rotations (and optional permutations), describe them in a JSON
+manifest and let the folding CLI update a checkpoint in-place:
+
+```
+uv run python -m transport.apply_transforms \
+  --checkpoint Qwen/Qwen2.5-7B-Instruct \
+  --output-dir runs/run_x/checkpoints/rotated \
+  --spec runs/run_x/transforms.json
+```
+
+Sample `transforms.json`:
+
+```
+{
+  "layers": [
+    {
+      "name": "model.layers.0",
+      "rotation_path": "runs/run_x/rotations/model.layers.0.pt"
+    },
+    {
+      "name": "model.layers.1",
+      "rotation_path": "runs/run_x/rotations/model.layers.1.pt",
+      "head_permutation_path": "runs/run_x/permutations/heads_1.pt",
+      "neuron_permutation_path": "runs/run_x/permutations/neurons_1.pt",
+      "head_dim": 128
+    }
+  ]
+}
+```
+
+The CLI loads the checkpoint (any HuggingFace model id or local directory),
+folds each transform via `WeightTransformSet`, and writes the updated weights +
+tokenizer to `--output-dir`.
+
+## Run scaffolding & dataset ledger
+
+Before GPU time is available you can still prepare a full `runs/<run_id>` shell
+plus a frozen snapshot of the ~200 blurbs and prompt/style files:
+
+```
+uv run python -m pipeline.run_scaffolder \
+  --runs-root runs \
+  --prompts-dir prompts \
+  --samples-dir samples
+```
+
+This command will:
+
+1. Hash every prompt/style file in `prompts/`.
+2. Hash every `.txt` sample in `samples/` to form a dataset ledger.
+3. Create `runs/<run_id>/manifest.json`, `dataset_snapshot.json`, `rotations.jsonl`,
+   and subdirectories for checkpoints/activations/logs.
+
+You can override any prompt list with `--prompt path/to/file.md`, set specific run
+ids via `--run-id`, and record tokenizer + commit metadata with
+`--tokenizer-name`, `--tokenizer-version`, `--teacher-commit`, and
+`--student-commit`.
+
+## Useful flags
+
+```
+python -m data_extraction.dump_activations --help
+```
+
+- ``--model`` – HuggingFace id to load (default: ``Qwen/Qwen3-7B``)
+- ``--dtype`` – Weight precision (float16 / bfloat16 / float32)
+- ``--device`` – Torch device string (defaults to auto)
+- ``--output-dir`` – Where ``sample_XXXX.pt`` files are stored
+- ``--layer`` – Optional module names if you only want specific hooks
+- ``--max-length`` – Token limit while tokenizing prompts
+- ``--backend`` – ``torch`` (default) or ``vllm`` for GPU-friendly capture
+- ``--hf-home`` / ``--hf-hub-cache`` – Override the persistent HF cache paths if needed
+- ``--vllm-*`` – Tensor parallel size, GPU utilization cap, max context, eager toggle
+
+That is the entire surface area—record and inspect activations without any
+pruning or fine-tuning extras.
+
+## GPU activation capture with vLLM
+
+The vLLM backend stands up the reference `Qwen/Qwen3-32B` checkpoint on the RTX 6000
+Ada, registers the same forward hooks, and streams shards directly to the persistent
+workspace cache. Sample run using the bilingual canned prompts:
 
 ```bash
-uv run python - <<'PY'
-from model.activation_recorder import load_model_for_activation_recording, record_activations_from_dataset
-
-model, tokenizer = load_model_for_activation_recording(
-    model_name="Qwen/Qwen3-32B",
-    device="cuda",
-    load_in_8bit=True
-)
-
-record_activations_from_dataset(
-    model=model,
-    tokenizer=tokenizer,
-    texts=None,                       # force it to read from /samples
-    sample_dir="samples",
-    save_dir="pruning_output/activations",
-    max_length=256
-)
-PY
+uv run python -m data_extraction.dump_activations \
+  --backend vllm \
+  --model Qwen/Qwen3-32B \
+  --dtype float16 \
+  --text-file samples/generic_en.txt \
+  --text-file samples/generic_zh.txt \
+  --output-dir activations/qwen3_32b_gpu \
+  --max-length 640 \
+  --analyze
 ```
 
-### Step 5: Execute Pruning - Quick Example
+Validation checklist:
 
-For a quick test run with the example script:
+- `ls -lh /workspace/.hf_home` – proves Hugging Face downloads land on the workspace disk.
+- `nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv` – shows the GPU is driving the run.
+- The `--analyze` table shouts per-layer magnitudes immediately after capture.
 
-```bash
-# Run the example script (uses default settings)
-uv run python -m model.example_pruning
-```
+All shards still include `metadata.jsonl` entries, so downstream rotation / transport tooling
+continues to work without changes.
 
-**Note**: The example script uses hardcoded texts. For production, use the full pipeline (Step 6).
+### GPU capture gotchas (Nov 2025)
 
-### Step 6: Execute Pruning - Full Pipeline
+The current vLLM releases (≥0.11) shuffled a few internals, so keep these in mind:
 
-For production pruning with custom configuration:
+1. **Single-process mode required for hooks** – `vllm.LLM` now launches multi-process workers by default, which hides the `model_executor` we reach into for attaching hooks. Export `VLLM_ENABLE_V1_MULTIPROCESSING=0` before running `data_extraction.dump_activations --backend vllm ...` so the driver exposes the old single-process worker objects.
+2. **Forward context + positions** – When you bypass the scheduler to call the model directly (what `ActivationDumper` does), you must supply the same forward context vLLM would normally create (`vllm.forward_context.set_forward_context(...)`) and match its position tensors. The helper in `model/vllm_activation_recorder.py` now accepts a custom `forward_runner`, but Qwen3 still errors with `rotary_embedding(...): query, key and positions must have the same number of tokens`. Until we mirror vLLM's internal `positions` buffers, expect this path to fail.
+3. **Fallback to torch backend when blocked** – You can always fall back to the plain PyTorch backend on a big GPU:  
+   `uv run python -m data_extraction.dump_activations --backend torch --model Qwen/Qwen3-32B --device cuda --dtype float16 --output-dir /workspace/activations ...`. This produces the same shard format (`metadata.jsonl` + `sample_XXXX.pt`) without relying on vLLM internals.
+4. **Write to the persistent mount** – The pod only persists `/workspace`, so point `--output-dir` at `/workspace/activations` (already created in this repo) to avoid losing shards between restarts.
 
-#### Option A: Modify the Pipeline Script Directly
+If you pick up the vLLM debugging again, start by logging the scheduler-built `positions` tensors inside `vllm/v1/worker` to replicate them inside `_make_forward_runner`, then re-enable CUDA graphs once everything lines up.
 
-Edit `model/pruning_pipeline.py` and update the `__main__` section:
+## QA toggles, metrics, and reporting
 
-```python
-# At the bottom of model/pruning_pipeline.py
-if __name__ == "__main__":
-    # Load your activation texts
-    with open('activation_texts.txt', 'r') as f:
-        activation_texts = [line.strip() for line in f if line.strip()]
-    
-    run_pruning_pipeline(
-        model_name="Qwen/Qwen3-32B",  # Your target model
-        activation_texts=activation_texts,
-        training_data_file=None,  # Optional: path to training_data.jsonl
-        output_dir="pruning_output",
-        pruning_ratio=0.3,  # Prune 30% of the model
-        num_epochs=3,
-        device="cuda",
-        load_in_8bit=True,  # Enable 8-bit quantization to save memory
-        load_in_4bit=False  # Use 4-bit for even more memory savings if needed
-    )
-```
+- Configure which transport modules/metrics are enabled via `config/eval_template.json`
+  (copy per run and edit checkpoint paths, variant toggles, etc.). The dataclasses live
+  in `config/evaluation.py` and can be loaded from JSON or TOML.
+- The notebook `notebooks/qa_toggle_metrics.ipynb` consumes that config, iterates
+  over checkpoints, and writes placeholder metric rows (`logit_kl`, `hidden_state_cosine`,
+  `residual_rms`, `surprisal`) to `runs/<run_id>/logs/metrics.jsonl`. Replace the stub
+  helpers with real evaluations once activations are ready.
+- Generate polished QA summaries (tables + seaborn plots) by running:
 
-Then run:
-```bash
-python -m model.pruning_pipeline
-```
+  ```bash
+  uv run python -m pipeline.report_generator \
+    --run-id run_YYYYMMDD \
+    --runs-root runs \
+    --mock  # drop this flag once real metrics exist
+  ```
 
-#### Option B: Use Python API Directly
+  The script ingests `manifest.json` + metrics JSONL, renders a Markdown report, and saves
+  metric plots to `runs/<run_id>/figures/metric_trends.png`.
 
-Create a custom script:
 
-```python
-# run_pruning.py
-from model import run_pruning_pipeline
-
-# Load activation texts
-with open('activation_texts.txt', 'r') as f:
-    activation_texts = [line.strip() for line in f if line.strip()]
-
-# Execute pruning
-run_pruning_pipeline(
-    model_name="Qwen/Qwen3-32B",
-    activation_texts=activation_texts,
-    training_data_file=None,  # Optional: "path/to/training_data.jsonl"
-    output_dir="pruning_output",
-    pruning_ratio=0.3,
-    num_epochs=3,
-    device="cuda",
-    load_in_8bit=True,
-    load_in_4bit=False
-)
-```
-
-Run it:
-```bash
-python run_pruning.py
-```
-
-### Step 7: Monitor Progress
-
-The pipeline will output progress for each step:
-
-1. **Loading model** - Downloads model if first time (~30-60GB)
-2. **Recording activations** - Processes your texts and saves activations
-3. **Analyzing activations** - Computes importance scores
-4. **Pruning model** - Removes less important layers/neurons
-5. **Fine-tuning** (if training data provided) - Recovers performance
-
-Monitor GPU memory:
-```bash
-# In another terminal or use RunPod's monitoring
-watch -n 1 nvidia-smi
-```
-
-### Step 8: Retrieve Results
-
-After completion, your outputs will be in the `pruning_output` directory:
-
-```bash
-ls -lh pruning_output/
-# You should see:
-# - activations/          # Recorded activation data
-# - analysis.json         # Pruning analysis results
-# - pruned_model.pt       # The pruned model
-# - fine_tuned_model.pt   # Fine-tuned model (if training data was provided)
-```
-
-Download results via RunPod's file manager or SCP:
-```bash
-# From your local machine
-scp -r runpod-pod-id:/workspace/OfflineTourGuide/pruning_output ./local_output/
-```
-
-## Configuration Options
-
-### Model Selection
-
-Choose based on your GPU VRAM:
-
-| Model | VRAM Required (8-bit) | VRAM Required (4-bit) | Disk Space |
-|-------|----------------------|----------------------|------------|
-| Qwen2.5-7B-Instruct | ~14GB | ~8GB | ~15GB |
-| Qwen3-32B | ~32GB | ~16GB | ~60GB |
-
-### Memory Configuration
-
-For different GPU sizes:
-
-**24GB GPU (RTX 4090, A6000):**
-```python
-load_in_8bit=True,   # Use 8-bit quantization
-load_in_4bit=False,
-batch_size=1,
-max_length=512
-```
-
-**40GB GPU (A100 40GB):**
-```python
-load_in_8bit=True,   # Can use 8-bit for Qwen3-32B
-load_in_4bit=False,
-batch_size=2,        # Can use larger batches
-max_length=512
-```
-
-**80GB GPU (A100 80GB):**
-```python
-load_in_8bit=False,  # Can use FP16 for better quality
-load_in_4bit=False,
-batch_size=4,        # Larger batches possible
-max_length=1024      # Longer sequences
-```
-
-### Pruning Ratio
-
-- **0.2 (20%)**: Conservative, minimal quality loss
-- **0.3 (30%)**: Balanced (recommended)
-- **0.5 (50%)**: Aggressive, may need more fine-tuning
-
-## What Happens During Execution
-
-The pipeline executes these steps automatically:
-
-1. **Model Loading** (~5-10 minutes first time)
-   - Downloads model from HuggingFace if not cached
-   - Loads with quantization if specified
-   - Verifies GPU availability
-
-2. **Activation Recording** (~10-30 minutes)
-   - Processes your activation texts through the model
-   - Captures intermediate layer activations
-   - Saves to disk (~5-20GB depending on model size)
-
-3. **Activation Analysis** (~5-15 minutes)
-   - Computes importance scores for each layer/neuron
-   - Identifies pruning candidates based on low activation
-   - Generates analysis report
-
-4. **Model Pruning** (~5-10 minutes)
-   - Removes identified layers/neurons
-   - Reconstructs model architecture
-   - Saves pruned model
-
-5. **Fine-tuning** (optional, ~30-60 minutes per epoch)
-   - Trains pruned model on your data
-   - Recovers performance lost from pruning
-   - Saves checkpoints
-
-## Best Practices
-
-### Storage Management
-
-1. **Use Persistent Storage**: Configure RunPod to use persistent storage for:
-   - Model cache (`/workspace/downloads/` - models are automatically downloaded here)
-   - Output directory (`pruning_output/`)
-   - This prevents re-downloading models on pod restart
-
-   **Note**: The Qwen3-32B model files are automatically downloaded to `/workspace/downloads/` when you run the pruning pipeline. Make sure to mount a persistent volume at `/workspace/downloads` to avoid re-downloading models on pod restart.
-
-2. **Monitor Resources**: Keep an eye on:
-   ```bash
-   # GPU memory
-   watch -n 1 nvidia-smi
-   
-   # Disk space
-   df -h /workspace
-   ```
-
-3. **Save Progress**: The pipeline saves checkpoints automatically, but you can also:
-   - Save activation files separately
-   - Export analysis.json for later review
-   - Keep model checkpoints if fine-tuning
-
-### Performance Optimization
-
-1. **Batch Size**: Start with `batch_size=1`, increase if you have VRAM headroom
-2. **Sequence Length**: Use `max_length=512` for activation recording (can be shorter)
-3. **Quantization**: Always enable 8-bit or 4-bit for models >7B parameters
-4. **Text Diversity**: Use diverse, domain-relevant texts for better pruning decisions
-
-## Troubleshooting
-
-### Out of Memory (OOM) Error
-
-**Symptoms**: `RuntimeError: CUDA out of memory`
-
-**Solutions**:
-```python
-# Option 1: Enable 4-bit quantization
-load_in_4bit=True,
-load_in_8bit=False,
-
-# Option 2: Reduce batch size
-batch_size=1,  # Already minimum, but verify
-
-# Option 3: Reduce sequence length
-max_length=256,  # Instead of 512
-
-# Option 4: Process fewer texts
-activation_texts = activation_texts[:50]  # Limit to 50 texts
-```
-
-### Disk Space Issues
-
-**Symptoms**: `No space left on device` during model download
-
-**Solutions**:
-```bash
-# Check disk usage
-df -h
-
-# Clean up old models
-rm -rf ~/.cache/huggingface/hub/models--*  # Remove unused models
-
-# Use smaller model for testing
-model_name="Qwen/Qwen2.5-7B-Instruct"  # Instead of 32B
-```
-
-### Slow Performance
-
-**Symptoms**: Processing takes much longer than expected
-
-**Check**:
-```python
-# Verify GPU is being used
-import torch
-print(torch.cuda.is_available())  # Should be True
-print(torch.cuda.get_device_name(0))  # Should show your GPU
-
-# Check CUDA version
-python -c "import torch; print(torch.version.cuda)"
-```
-
-**Solutions**:
-- Ensure `device="cuda"` is set
-- Verify CUDA drivers are installed on RunPod
-- Use appropriate batch sizes (not too small, not too large)
-
-### Model Download Fails
-
-**Symptoms**: `ConnectionError` or timeout during model download
-
-**Solutions**:
-```bash
-# Models are automatically downloaded to /workspace/downloads
-# Ensure this directory exists and has sufficient space:
-mkdir -p /workspace/downloads
-df -h /workspace/downloads  # Check available space
-
-# Or use a mirror (if available)
-export HF_ENDPOINT=https://hf-mirror.com
-```
-
-### Activation Recording Fails
-
-**Symptoms**: Error during activation recording step
-
-**Solutions**:
-- Verify activation texts are not empty
-- Check that texts are strings, not other types
-- Ensure sufficient disk space for activations
-- Try with fewer texts first to isolate the issue
-
-## Verifying Results
-
-After execution completes, verify the outputs:
-
-```bash
-# Check outputs exist
-ls -lh pruning_output/
-
-# View analysis results
-cat pruning_output/analysis.json | python -m json.tool | head -50
-
-# Check model file size
-ls -lh pruning_output/pruned_model.pt
-
-# Verify model can be loaded
-python -c "
-import torch
-model = torch.load('pruning_output/pruned_model.pt')
-print(f'Model loaded: {type(model)}')
-"
-```
-
-## Next Steps After Pruning
-
-1. **Download Results**: Use RunPod file manager or SCP to download:
-   - `pruned_model.pt` - The pruned model
-   - `analysis.json` - Pruning analysis for review
-   - `activations/` - Activation data (optional, large files)
-
-2. **Test Locally**: Load and test the pruned model:
-   ```python
-   import torch
-   model = torch.load('pruned_model.pt')
-   # Test inference
-   ```
-
-3. **Fine-tune Further**: If quality is insufficient:
-   - Prepare training data in JSONL format
-   - Re-run pipeline with `training_data_file` parameter
-   - Increase `num_epochs` if needed
-
-4. **Convert for Mobile**: 
-   - Convert to ONNX or other mobile-friendly format
-   - Quantize further if needed
-   - Test on target device
-
-5. **Deploy**: Integrate pruned model into your application
-
-## Additional Documentation
-
-For more detailed information, see:
-
-- **[model/PRUNING_GUIDE.md](model/PRUNING_GUIDE.md)** - Detailed pruning concepts and workflows
-- **[model/ACTIVATION_PRUNING_FAQ.md](model/ACTIVATION_PRUNING_FAQ.md)** - Common questions and answers
-- **[PLAN.md](PLAN.md)** - Project plan and roadmap
-
-## Module Structure
-
-```
-model/
-├── activation_recorder.py    # Record activations from models
-├── activation_analyzer.py    # Analyze activations for pruning
-├── pruner.py                # Implement structured pruning
-├── finetune.py              # Fine-tuning utilities
-├── pruning_pipeline.py      # Complete pipeline script
-└── example_pruning.py       # Simple example script
-```
-
-## Requirements
-
-- Python 3.12+
-- PyTorch 2.0+
-- Transformers 4.40+
-- bitsandbytes for quantization (Linux/Windows only)

@@ -1,0 +1,101 @@
+City	Plus Code	Language	Place (Local name)	Output File	Status
+Paris	8FW4V75V+8Q	fr	Tour Eiffel	samples/8FW4V75V+8Q_fr.txt	improved
+Rio de Janeiro	589R2QXQ+6R	pt	Cristo Redentor	samples/589R2QXQ+6R_pt.txt	improved
+Bangkok	7P52R7CH+6R	th	วัดอรุณ	samples/7P52R7CH+6R_th.txt	improved
+Tokyo	8Q7XJPGM+7Q	ja	皇居	samples/8Q7XJPGM+7Q_ja.txt	improved
+Rome	8FHJVFWP+7M	it	Pantheon	samples/8FHJVFWP+7M_it.txt	improved
+Mexico City	C8MJ+P6	es	Museo Nacional de Antropología	samples/C8MJ+P6_es.txt	improved
+Bangkok	7P52R7GH+5M	th	พระบรมมหาราชวัง	samples/7P52R7GH+5M_th.txt	improved
+Seoul	8Q98JVHM+6R	ko	N서울타워	samples/8Q98JVHM+6R_ko.txt	improved
+Paris	8FW4V8QP+8M	fr	Basilique du Sacré-Cœur	samples/8FW4V8QP+8M_fr.txt	done
+Cairo	7GWHF3QM+7R	ar	المتحف المصري	samples/7GWHF3QM+7R_ar.txt	improved
+Istanbul	8GHC9HFM+7Q	tr	Galata Kulesi	samples/8GHC9HFM+7Q_tr.txt	done
+Rio de Janeiro	58XC+PQ	pt	Estádio do Maracanã	samples/58XC+PQ_pt.txt	improved
+Tokyo	8Q7XJMFH+5M	ja	渋谷スクランブル交差点	samples/8Q7XJMFH+5M_ja.txt	improved
+Rome	8FH2VH7H+3R	it	Basilica di San Pietro	samples/8FH2VH7H+3R_it.txt	improved
+Mexico City	C9JW+XC	es	Palacio de Bellas Artes	samples/C9JW+XC_es.txt	improved
+Bangkok	7P52R7GH+4P	th	วัดพระแก้ว	samples/7P52R7GH+4P_th.txt	improved
+Seoul	8Q98JW4M+7Q	ko	북촌한옥마을	samples/8Q98JW4M+7Q_ko.txt	improved
+Paris	8FW4V7GX+2Q	fr	Arc de Triomphe	samples/8FW4V7GX+2Q_fr.txt	improved
+Cairo	7GWHF3RM+6P	ar	خان الخليلي	samples/7GWHF3RM+6P_ar.txt	improved
+Istanbul	8GHC9H3M+5P	tr	Kapalıçarşı	samples/8GHC9H3M+5P_tr.txt	improved
+Rio de Janeiro	58QP+8M	pt	Jardim Botânico do Rio de Janeiro	samples/58QP+8M_pt.txt	improved
+Tokyo	8Q7XMPJH+6P	ja	東京スカイツリー	samples/8Q7XMPJH+6P_ja.txt	improved
+Rome	8FHJVFRV+46	it	Colosseo	samples/8FHJVFRV+46_it.txt	improved
+Mexico City	C9JX+HV	es	Templo Mayor	samples/C9JX+HV_es.txt	improved
+Bangkok	7P52R7FH+3Q	th	วัดโพธิ์	samples/7P52R7FH+3Q_th.txt	improved
+Seoul	8Q98JVPM+5H	ko	명동	samples/8Q98JVPM+5H_ko.txt	improved
+Paris	8FW4V7MX+HW	fr	Cathédrale Notre-Dame de Paris	samples/8FW4V7MX+HW_fr.txt	improved
+Cairo	7GWHF3QM+8Q	ar	قلعة صلاح الدين	samples/7GWHF3QM+8Q_ar.txt	improved
+Istanbul	8GHC9H7M+6R	tr	Topkapı Sarayı	samples/8GHC9H7M+6R_tr.txt	improved
+Rio de Janeiro	587G+VF	pt	Pão de Açúcar	samples/587G+VF_pt.txt	improved
+Tokyo	8Q7XJP8J+5M	ja	浅草寺	samples/8Q7XJP8J+5M_ja.txt	improved
+Rome	8FH2VH8H+2Q	it	Musei Vaticani	samples/8FH2VH8H+2Q_it.txt	improved
+Mexico City	C79G+84	es	Museo Frida Kahlo	samples/C79G+84_es.txt	improved
+Bangkok	7P52R7MH+8P	th	ถนนข้าวสาร	samples/7P52R7MH+8P_th.txt	improved
+Seoul	8Q98JW4M+9R	ko	창덕궁	samples/8Q98JW4M+9R_ko.txt	improved
+Paris	8FW4V7JV+4X	fr	Musée du Louvre	samples/8FW4V7JV+4X_fr.txt	improved
+Cairo	7GWHF3RM+7P	ar	جامع الأزهر	samples/7GWHF3RM+7P_ar.txt	improved
+Istanbul	8GHC9H5M+8Q	tr	Sultan Ahmet Camii	samples/8GHC9H5M+8Q_tr.txt	improved
+Rio de Janeiro	588F+5H	pt	Praia de Copacabana	samples/588F+5H_pt.txt	improved
+Tokyo	8Q7XJMFJ+8R	ja	明治神宮	samples/8Q7XJMFJ+8R_ja.txt	improved
+Rome	8FHJVFRV+2C	it	Foro Romano	samples/8FHJVFRV+2C_it.txt	improved
+Mexico City	C9JX+5W	es	Palacio Nacional	samples/C9JX+5W_es.txt	improved
+Seoul	8Q98JW3M+8P	ko	경복궁	samples/8Q98JW3M+8P_ko.txt	improved
+Paris	8FW4V7MX+7C	fr	Sainte-Chapelle	samples/8FW4V7MX+7C_fr.txt	improved
+Cairo	7GWHC22M+5P	ar	أهرامات الجيزة	samples/7GWHC22M+5P_ar.txt	improved
+Istanbul	8GHC9H6M+7P	tr	Ayasofya	samples/8GHC9H6M+7P_tr.txt	improved
+Amsterdam	9F4698XM+5P	nl	Rijksmuseum	samples/9F4698XM+5P_nl.txt	improved
+Barcelona	8FH48X3M+R7	es	Sagrada Família	samples/8FH48X3M+R7_es.txt	improved
+New York	87G8P2JX+4Q	en	Statue of Liberty	samples/87G8P2JX+4Q_en.txt	improved
+London	9C3XGVJJ+6Q	en	Big Ben / Elizabeth Tower	samples/9C3XGVJJ+6Q_en.txt	improved
+Singapore	6PH58P3Q+7M	en	Marina Bay Sands	samples/6PH58P3Q+7M_en.txt	improved
+Santorini	8G85JF4M+8Q	el	Οία	samples/8G85JF4M+8Q_el.txt	improved
+Xi'An	8P6R97MH+J9	zh	兵马俑（秦始皇陵兵马俑博物馆）	samples/8P6R97MH+J9_zh.txt	improved
+Xi'An	8P6R6X97+7M	zh	大雁塔	samples/8P6R6X97+7M_zh.txt	improved
+Xi'An	8P6R7W2W+QW	zh	西安城墙（永宁门）	samples/8P6R7W2W+QW_zh.txt	improved
+Xi'An	8P6R6X6F+WV	zh	大唐芙蓉园	samples/8P6R6X6F+WV_zh.txt	improved
+Xi'An	8P6R7XM8+CM	zh	大明宫国家遗址公园	samples/8P6R7XM8+CM_zh.txt	improved
+Xi'An	8P6R7W5W+QR	zh	钟楼	samples/8P6R7W5W+QR_zh.txt	improved
+Xi'An	8P6R6WQR+2Q	zh	鼓楼	samples/8P6R6WQR+2Q_zh.txt	improved
+Xi'An	8P6R7W5V+WX	zh	回民街	samples/8P6R7W5V+WX_zh.txt	improved
+Xi'An	8P6R9667+M6	zh	华清池	samples/8P6R9667+M6_zh.txt	improved
+Xi'An	8P6R6XF4+C4	zh	陕西历史博物馆	samples/8P6R6XF4+C4_zh.txt	improved
+Sydney	4RRH46H4+8M	en	Queen Victoria Building (QVB)	samples/4RRH46H4+8M_en.txt	improved
+Sydney	4RRH4678+GR	en	Surry Hills Cat Crossing	samples/4RRH4678+GR_en.txt	improved
+Sydney	4RRH46X6+38	en	Harbour Bridge	samples/4RRH46X6+38_en.txt	improved
+Sydney	4RRH454R+MQ	en	Carriageworks	samples/4RRH454R+MQ_en.txt	improved
+Sydney	4RRH475G+9JG	en	Bondi Beach	samples/4RRH475G+9JG_en.txt	improved
+Sydney	4RRH46V8+74	en	Sydney Opera House	samples/4RRH46V8+74_en.txt	improved
+Sydney	4RRH46P8+8J	en	Royal Botanic Garden	samples/4RRH46P8+8J_en.txt	improved
+Sydney	4RRH46R5+VC	en	The Rocks Market	samples/4RRH46R5+VC_en.txt	improved
+Sydney	4RRH46H6+9J	en	Hyde Park	samples/4RRH46H6+9J_en.txt	improved
+Prague	9F2P3CGJ+8Q	cs	Pražský hrad	samples/9F2P3CGJ+8Q_cs.txt	improved
+Prague	9F2P3C9J+5M	cs	Karlův most	samples/9F2P3C9J+5M_cs.txt	improved
+Prague	9F2P3CCJ+7P	cs	Staroměstské náměstí	samples/9F2P3CCJ+7P_cs.txt	improved
+Prague	9F2P3CGJ+9R	cs	Katedrála svatého Víta	samples/9F2P3CGJ+9R_cs.txt	improved
+Amsterdam	9F4698WM+4R	nl	Van Gogh Museum	samples/9F4698WM+4R_nl.txt	improved
+Amsterdam	9F469C3P+8M	nl	Anne Frank Huis	samples/9F469C3P+8M_nl.txt	improved
+Amsterdam	9F469C4P+5M	nl	Grachtengordel	samples/9F469C4P+5M_nl.txt	improved
+Barcelona	8FH4C2M8+5Q	es	Park Güell	samples/8FH4C2M8+5Q_es.txt	improved
+Barcelona	8FH48X5P+6M	es	Casa Batlló	samples/8FH48X5P+6M_es.txt	improved
+Barcelona	8FH48W3M+8P	es	Barri Gòtic	samples/8FH48W3M+8P_es.txt	improved
+Kyoto	8Q6R5M5H+7P	ja	伏見稲荷大社	samples/8Q6R5M5H+7P_ja.txt	improved
+Kyoto	8Q6R5R3G+8M	ja	金閣寺	samples/8Q6R5R3G+8M_ja.txt	improved
+Kyoto	8Q6R5M8J+6Q	ja	清水寺	samples/8Q6R5M8J+6Q_ja.txt	improved
+Kyoto	8Q6R5J2F+5R	ja	嵐山竹林	samples/8Q6R5J2F+5R_ja.txt	improved
+Kyoto	8Q6R5M7J+7P	ja	祇園	samples/8Q6R5M7J+7P_ja.txt	improved
+Mumbai	7JFJ3RGH+6M	hi	गेटवे ऑफ इंडिया	samples/7JFJ3RGH+6M_hi.txt	improved
+Mumbai	7JFJ3RMH+7P	hi	छत्रपती शिवाजी टर्मिनस	samples/7JFJ3RMH+7P_hi.txt	improved
+Mumbai	7JFJ3QMH+8R	hi	मरीन ड्राइव	samples/7JFJ3QMH+8R_hi.txt	improved
+Xi'An	8P6R97MH+J9	en	Emperor Qinshihuang's Mausoleum Site Museum	samples/8P6R97MH+J9_en.txt	improved
+Xi'An	8P6R6X97+7M	en	Giant Wild Goose Pagoda	samples/8P6R6X97+7M_en.txt	improved
+Xi'An	8P6R7W2W+QW	en	Xi'an Wall Yongningmen	samples/8P6R7W2W+QW_en.txt	improved
+Xi'An	8P6R6X6F+WV	en	Tang Paradise	samples/8P6R6X6F+WV_en.txt	improved
+Xi'An	8P6R7XM8+CM	en	Daming Palace National Heritage Park	samples/8P6R7XM8+CM_en.txt	improved
+Xi'An	8P6R7W5W+QR	en	Bell Tower of Xi'an	samples/8P6R7W5W+QR_en.txt	improved
+Xi'An	8P6R6WQR+2Q	en	Drum Tower	samples/8P6R6WQR+2Q_en.txt	improved
+Xi'An	8P6R7W5V+WX	en	Huimin Street	samples/8P6R7W5V+WX_en.txt	improved
+Xi'An	8P6R9667+M6	en	Huaqing Pool	samples/8P6R9667+M6_en.txt	improved
+Xi'An	8P6R6XF4+C4	en	Shaanxi History Museum	samples/8P6R6XF4+C4_en.txt	improved
+
