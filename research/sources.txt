@@ -2,3 +2,55 @@ orthogonal CCA/PCA alignment for multilingual encoders
 canonical paper on SVCCA alignment
 Li et al.’s attention head matching
 Householder-based stabilization in TinyStories distills
+
+
+"When Embeddings Models Meet: Procrustes Bounds and Applications"
+https://openreview.net/forum?id=DLEzSo1DIk
+
+
+Editing Models with Task Arithmetic
+https://github.com/mlfoundations/task_vectors
+
+"We build task vectors by subtracting the weights of a pre-trained model from the weights of the same model after fine-tuning on a task. We show that these task vectors can be modified and combined together through arithmetic operations such as negation and addition, and the behavior of the resulting model is steered accordingly.
+
+
+
+
+KNOWLEDGE DISTILLATION THROUGH GEOMETRY AWARE REPRESENTATIONAL ALIGNMENT
+https://arxiv.org/pdf/2509.25253
+"motivation and theoretical backing for using Procrustes stuff"
+
+
+
+
+Activation steering is a technique for influencing the behavior of language models by modifying their internal activations during inference. This library provides tools for:
+- Extracting steering vectors from contrastive examples
+- Applying steering vectors to modify model behavior
+
+https://github.com/IBM/activation-steering
+
+
+Ahh this is basically it --
+Steering Language Models With Activation Engineering
+https://arxiv.org/abs/2308.10248
+
+
+If you write this up, I’d explicitly:
+
+Cite ActAdd, conceptors, FGAA as the activation-steering lineage.
+Cite Procrustes / Wasserstein-Procrustes and embedding alignment as your matrix-alignment backbone.
+Emphasize:
+Teacher–student, closed-form, weight-integrated aspect.
+Data efficiency via designed near negatives.
+
+
+
+I’d pitch your work as:
+
+Gradient-Free Task-Local Geometric Distillation:
+Using small, synthetic, contrastive datasets to extract low-rank change-of-basis transformations between Teacher and Student latent spaces, then folding those transforms into Student weights and merging with a base model, achieving style/task transfer with zero inference overhead.
+
+The three deltas:
+gradient-free closed-form alignment
+task-local synthetic subspaces (near negatives)
+and weight-space change-of-basis & merging
